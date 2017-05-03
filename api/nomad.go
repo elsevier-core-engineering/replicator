@@ -541,6 +541,7 @@ func (c *nomadClient) GetTaskGroupResources(jobName string, groupPolicy *structs
 func (c *nomadClient) EvaluateJobScaling(jobs []*structs.JobScalingPolicy) {
 	for _, policy := range jobs {
 		for _, gsp := range policy.GroupScalingPolicies {
+			logging.Debug("api/nomad: evaluating scaling for job %v", policy.JobName)
 			c.GetTaskGroupResources(policy.JobName, gsp)
 
 			allocs, _, err := c.nomad.Jobs().Allocations(policy.JobName, false, &nomad.QueryOptions{})

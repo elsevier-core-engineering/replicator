@@ -69,7 +69,7 @@ func (c *consulClient) GetJobScalingPolicies(config *structs.Config, nomadClient
 		// TODO (e.westfall): We should not exclude jobs with scaling disabled as
 		// this prevents users from running in dry-run mode to see what *would*
 		// have happened.
-		if s.Enabled && nomadClient.IsJobRunning(s.JobName) {
+		if nomadClient.IsJobRunning(s.JobName) {
 
 			// Each scaling policy document is then appended to a list to form a full
 			// view of all scaling documents available to the cluster.

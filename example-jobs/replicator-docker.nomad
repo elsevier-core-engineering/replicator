@@ -16,25 +16,17 @@ job "replicator" {
     count = 2
 
     task "replicator" {
-      driver = "exec"
-
-      constraint {
-        attribute = "${attr.kernel.name}"
-        value     = "linux"
-      }
+      driver = "docker"
 
       config {
-        command = "${attr.kernel.name}-${attr.cpu.arch}-replicator"
-        args    = [
+        image        = "elsce/replicator:${NOMAD_META_VERSION}"
+        network_mode = "host"
+        args         = [
           "agent",
           "-aws-region=us-east-1",
           "-consul-token=CONSUL_ACL_TOKEN",
           "-cluster-autoscaling-group=WORKER_POOL_ASG_NAME",
         ]
-      }
-
-      artifact {
-        source = "https://github.com/elsevier-core-engineering/replicator/releases/download/${NOMAD_META_VERSION}/${attr.kernel.name}-${attr.cpu.arch}-replicator"
       }
 
       resources {

@@ -80,7 +80,7 @@ func ScaleOutCluster(asgName string, nodeCount int, svc *autoscaling.AutoScaling
 			maxSize)
 	}
 
-	// The DesiredCapacity is incramented by 1, while the TerminationPolicies and
+	// The DesiredCapacity is incremented by 1, while the TerminationPolicies and
 	// AvailabilityZones which are required parameters are copied from the Info
 	// received from the initial call to DescribeScalingGroup. These params could
 	// be directly referenced within UpdateAutoScalingGroupInput but are here for
@@ -173,11 +173,34 @@ func DetachInstance(asgName, instanceID string, svc *autoscaling.AutoScaling) (e
 	return
 }
 
-// ScaleInCluster scales the cluster size by 1 by using the DetachInstances call
-// to target an instance to remove from the ASG.
-func ScaleInCluster(asgName, instanceIP string, svc *autoscaling.AutoScaling) error {
+// ScaleInCluster scales the cluster size by -1 by using the DetachInstances
+// call to target an instance for removal from the ASG.
+func ScaleInCluster(asgName, instanceIP string, nodeCount int, svc *autoscaling.AutoScaling) error {
 
 	instanceID := TranslateIptoID(instanceIP, *svc.Config.Region)
+
+	// Get the current ASG configuration so that we have the basis on which to
+	// update to our new desired state.
+	asg, err := DescribeScalingGroup(asgName, svc)
+	if err != nil {
+		return err
+	}
+
+	// Evaluate the desired capacity against the current worker count and the
+	// MinSize. If the desired capacity -1 is less than the MinSize the AWS call
+	// would fail so we bail anyway.
+	desiredCap := *asg.AutoScalingGroups[0].DesiredCapacity
+	minSize := *asg.AutoScalingGroups[0].MinSize
+
+	if desiredCap != int64(nodeCount) {
+		return fmt.Errorf("asg desired capacity %v does not match the current "+
+			"Nomad worker pool count %v", desiredCap, nodeCount)
+	}
+
+	if desiredCap-int64(1) < minSize {
+		return fmt.Errorf("decrementing asg count would violate asg min size of %v",
+			minSize)
+	}
 
 	// Setup the Input parameters ready for the AWS API call and then trigger the
 	// call which will remove the identified instance from the ASG and decrement

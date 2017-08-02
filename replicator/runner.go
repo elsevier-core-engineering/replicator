@@ -294,7 +294,8 @@ func (r *Runner) clusterScaling(done chan bool, state *structs.State) {
 
 			logging.Info("core/runner: terminating AWS instance %v", nodeIP)
 			err := client.ScaleInCluster(
-				r.config.ClusterScaling.AutoscalingGroup, nodeIP, asgSess)
+				r.config.ClusterScaling.AutoscalingGroup, nodeIP,
+				clusterCapacity.NodeCount, asgSess)
 			if err != nil {
 				logging.Error("core/runner: unable to successfully terminate AWS "+
 					"instance %v: %v", nodeID, err)

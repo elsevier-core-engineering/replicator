@@ -11,70 +11,8 @@ import (
 	"github.com/elsevier-core-engineering/replicator/replicator/structs"
 )
 
-// newNodeRegistry returns a new NodeRegistry object to allow Replicator
-// to track discovered worker pools and nodes.
-func newNodeRegistry() *structs.NodeRegistry {
-	return &structs.NodeRegistry{
-		WorkerPools:     make(map[string]*structs.WorkerPool),
-		RegisteredNodes: make(map[string]string),
-		Lock:            sync.RWMutex{},
-	}
-}
-
-// checkPoolScalingThreshold determines if we've reached the required number
-// of consecutive scaling attempts.
-func checkPoolScalingThreshold(state *structs.ScalingState, direction string,
-	workerPool *structs.WorkerPool, config *structs.Config) (scale bool) {
-
-	switch direction {
-	case client.ScalingDirectionIn:
-		state.ScaleInRequests++
-		state.ScaleOutRequests = 0
-		if state.ScaleInRequests == workerPool.ScalingThreshold {
-			logging.Debug("core/cluster_scaling: cluster scale-in request %v for "+
-				"worker pool %v meets the threshold %v", state.ScaleInRequests,
-				workerPool.Name, workerPool.ScalingThreshold)
-			state.ScaleInRequests = 0
-			scale = true
-		} else {
-			logging.Debug("core/cluster_scaling: cluster scale-in request %v for "+
-				"worker pool %v does not meet the threshold %v", state.ScaleInRequests,
-				workerPool.Name, workerPool.ScalingThreshold)
-		}
-
-	case client.ScalingDirectionOut:
-		state.ScaleOutRequests++
-		state.ScaleInRequests = 0
-		if state.ScaleOutRequests == workerPool.ScalingThreshold {
-			logging.Debug("core/cluster_scaling: cluster scale-out request %v for "+
-				"worker pool %v meets the threshold %v", state.ScaleOutRequests,
-				workerPool.Name, workerPool.ScalingThreshold)
-			state.ScaleOutRequests = 0
-			scale = true
-		} else {
-			logging.Debug("core/cluster_scaling: cluster scale-out request %v for "+
-				"worker pool %v does not meet the threshold %v", state.ScaleOutRequests,
-				workerPool.Name, workerPool.ScalingThreshold)
-		}
-
-	default:
-		state.ScaleInRequests = 0
-		state.ScaleOutRequests = 0
-	}
-
-	// One way or another we have updated our internal state, therefore this needs
-	// to be written to our persistent state store.
-	if err := config.ConsulClient.PersistState(state); err != nil {
-		logging.Error("core:cluster_scaling: unable to update cluster scaling "+
-			"state to persistent store at path %v: %v", state.StatePath, err)
-		scale = false
-	}
-
-	return scale
-}
-
 // asyncClusterScaling triggers concurrent cluster scaling operations for
-// each worker group in the node registry.
+// each worker pool in the node registry.
 func (r *Runner) asyncClusterScaling(nodeRegistry *structs.NodeRegistry,
 	jobRegistry *structs.JobScalingPolicies) {
 
@@ -95,20 +33,20 @@ func (r *Runner) asyncClusterScaling(nodeRegistry *structs.NodeRegistry,
 	return
 }
 
-// workerPoolScaling is a thread safe method for scaling a worker pool.
+// workerPoolScaling is a thread safe method for scaling an individual
+// worker pool.
 func (r *Runner) workerPoolScaling(poolName string,
-	NodeRegistry *structs.NodeRegistry, jobs *structs.JobScalingPolicies,
+	nodeRegistry *structs.NodeRegistry, jobs *structs.JobScalingPolicies,
 	wg *sync.WaitGroup) {
-
-	// Obtain a read-only lock on the Node registry.
-	NodeRegistry.Lock.RLock()
-	defer NodeRegistry.Lock.RUnlock()
-
-	// Obtain a reference to our worker pool.
-	workerPool := NodeRegistry.WorkerPools[poolName]
 
 	// Inform the wait group we have finished our task upon completion.
 	defer wg.Done()
+
+	// Obtain a read-only lock on the Node registry, grab a reference to
+	// our worker pool object and release the lock.
+	nodeRegistry.Lock.RLock()
+	workerPool := nodeRegistry.WorkerPools[poolName]
+	nodeRegistry.Lock.RUnlock()
 
 	// Setup references to clients for Nomad and Consul.
 	nomadClient := r.config.NomadClient
@@ -118,17 +56,17 @@ func (r *Runner) workerPoolScaling(poolName string,
 	poolCapacity := &structs.ClusterCapacity{}
 
 	// Initialize a new scaling state object and set helper fields.
-	poolState := &structs.ScalingState{}
-	poolState.ResourceType = ClusterType
-	poolState.ResourceName = workerPool.Name
-	poolState.StatePath = r.config.ConsulKeyRoot + "/state/nodes/" +
+	workerPool.State = &structs.ScalingState{}
+	workerPool.State.ResourceType = ClusterType
+	workerPool.State.ResourceName = workerPool.Name
+	workerPool.State.StatePath = r.config.ConsulKeyRoot + "/state/nodes/" +
 		workerPool.Name
 
 	// Attempt to load state from persistent storage.
-	consulClient.ReadState(poolState, true)
+	consulClient.ReadState(workerPool.State, true)
 
 	// Setup a failure message to pass to the failsafe check.
-	message := &notifier.FailureMessage{
+	msg := &notifier.FailureMessage{
 		AlertUID:     workerPool.NotificationUID,
 		ResourceID:   workerPool.Name,
 		ResourceType: ClusterType,
@@ -136,7 +74,7 @@ func (r *Runner) workerPoolScaling(poolName string,
 
 	// If the worker pool is in failsafe mode, decline to perform any scaling
 	// evaluation or action.
-	if !FailsafeCheck(poolState, r.config, workerPool.RetryThreshold, message) {
+	if !FailsafeCheck(workerPool.State, r.config, workerPool.RetryThreshold, msg) {
 		logging.Warning("core/cluster_scaling: worker pool %v is in failsafe "+
 			"mode, no scaling evaluations will be performed", workerPool.Name)
 		return
@@ -150,56 +88,64 @@ func (r *Runner) workerPoolScaling(poolName string,
 		return
 	}
 
+	// Copy the desired scsaling direction to the state object.
+	workerPool.State.ScalingDirection = poolCapacity.ScalingDirection
+
+	// Attempt to update state tracking information in Consul.
+	if err = consulClient.PersistState(workerPool.State); err != nil {
+		logging.Error("core/cluster_scaling: %v", err)
+	}
+
+	// Call the scaling provider safety check to determine if we should
+	// proceed with scaling evaluation.
+	if scale := workerPool.ScalingProvider.SafetyCheck(workerPool); !scale {
+		logging.Debug("core/cluster_scaling: scaling operation for worker pool %v"+
+			"is not permitted by the scaling provider", workerPool.Name)
+		return
+	}
+
 	// Determine if the scaling cooldown threshold has been met.
-	ok := checkCooldownThreshold(workerPool.Cooldown, workerPool.Name, poolState)
+	ok := checkCooldownThreshold(workerPool)
 	if !ok {
 		return
 	}
 
 	// Determine if we've reached the required number of consecutive scaling
 	// requests.
-	ok = checkPoolScalingThreshold(poolState, poolCapacity.ScalingDirection,
-		workerPool, r.config)
+	ok = checkPoolScalingThreshold(workerPool, r.config)
 	if !ok {
 		return
 	}
 
-	// TODO (e.westfall): Add a check here for the global cluster scaling
-	// enabled flag.
-	// If cluster scaling has been globally disabled, halt evaluation.
-	// if !r.config.ClusterScaling.Enabled {
-	// 	logging.Debug("core/cluster_scaling: cluster scaling has been globally "+
-	// 		"disabled, a scaling operation (%v) would have been initiated against "+
-	// 		"worker pool %v", poolCapacity.ScalingDirection, workerPool.Name)
-	// 	return
-	// }
-
-	// Setup session to AWS auto scaling service.
-	asgSess := client.NewAWSAsgService(workerPool.Region)
-
-	if poolCapacity.ScalingDirection == client.ScalingDirectionOut {
-		// If we've determined the worker pool should be scaled out, initiate
-		// the scaling operation.
-		err = client.ScaleOutCluster(workerPool.Name, poolCapacity.NodeCount, asgSess)
+	if poolCapacity.ScalingDirection == structs.ScalingDirectionOut {
+		// Initiate cluster scaling operation by calling the scaling provider.
+		err = workerPool.ScalingProvider.Scale(workerPool, r.config, nodeRegistry)
 		if err != nil {
-			logging.Error("core/cluster_scaling: unable to successfully initiate a "+
-				"scaling operation against worker pool %v: %v",
+			logging.Error("core/cluster_scaling: an error occurred while "+
+				"attempting a scaling operation against worker pool %v: %v",
 				workerPool.Name, err)
 			return
 		}
 
-		// Verify scaling operation has completed successfully.
-		r.verifyPoolScaling(workerPool, poolState, r.config)
+		// Obtain a read/write lock on the node registry, write the worker
+		// pool state object back to the node registry and release the lock.
+		nodeRegistry.Lock.Lock()
+		nodeRegistry.WorkerPools[workerPool.Name].State = workerPool.State
+		nodeRegistry.Lock.Unlock()
 	}
 
 	if poolCapacity.ScalingDirection == client.ScalingDirectionIn {
 		// Identify the least allocated node in the worker pool.
-		nodeID, nodeIP := nomadClient.LeastAllocatedNode(poolCapacity, poolState)
+		nodeID, nodeIP := nomadClient.LeastAllocatedNode(poolCapacity, workerPool.State)
 		if nodeIP == "" || nodeID == "" {
 			logging.Error("core/cluster_scaling: unable to identify the least "+
 				"allocated node in worker pool %v", workerPool.Name)
 			return
 		}
+
+		// Register the least allocated node as eligible for scaling actions.
+		workerPool.State.EligibleNodes = append(workerPool.State.EligibleNodes,
+			nodeIP)
 
 		// Place the least allocated noded in drain mode.
 		if err = nomadClient.DrainNode(nodeID); err != nil {
@@ -209,23 +155,20 @@ func (r *Runner) workerPoolScaling(poolName string,
 			return
 		}
 
-		// Detach node from worker pool and terminate the instance.
-		logging.Info("core/cluster_scaling: terminating node %v from worker "+
-			"pool %v", nodeID, workerPool.Name)
-		if err = client.ScaleInCluster(workerPool.Name, nodeIP, asgSess); err != nil {
-			logging.Error("core/cluster_scaling: attempt to terminate node %v from "+
-				"worker pool %v failed: %v", nodeID, workerPool.Name, err)
+		// Initiate cluster scaling operation by calling the scaling provider.
+		err := workerPool.ScalingProvider.Scale(workerPool, r.config, nodeRegistry)
+		if err != nil {
+			logging.Error("core/cluster_scaling: an error occurred while "+
+				"attempting a scaling operation against worker pool %v: %v",
+				workerPool.Name, err)
 			return
 		}
 
-		// Update the last scaling event timestamp and reset failure counts.
-		poolState.LastScalingEvent = time.Now()
-		poolState.FailureCount = 0
-
-		// Attempt to update state tracking information in Consul.
-		if err = consulClient.PersistState(poolState); err != nil {
-			logging.Error("core/cluster_scaling: %v", err)
-		}
+		// Obtain a read/write lock on the node registry, write the worker
+		// pool state object back to the node registry and release the lock.
+		nodeRegistry.Lock.Lock()
+		nodeRegistry.WorkerPools[workerPool.Name].State = workerPool.State
+		nodeRegistry.Lock.Unlock()
 	}
 
 	metrics.IncrCounter([]string{"cluster", "scale_out_success"}, 1)
@@ -233,137 +176,89 @@ func (r *Runner) workerPoolScaling(poolName string,
 	return
 }
 
-// verifyPoolScaling verifies a cluster scaling operation completed
-// successfully and retries the operation if failures are detected.
-func (r *Runner) verifyPoolScaling(workerPool *structs.WorkerPool,
-	state *structs.ScalingState, config *structs.Config) (ok bool) {
+// checkPoolScalingThreshold determines if we've reached the required number
+// of consecutive scaling attempts.
+func checkPoolScalingThreshold(workerPool *structs.WorkerPool,
+	config *structs.Config) (scale bool) {
 
-	// Setup references to clients for Nomad and Consul.
-	nomadClient := r.config.NomadClient
-	consulClient := r.config.ConsulClient
+	switch workerPool.State.ScalingDirection {
+	case structs.ScalingDirectionIn:
+		workerPool.State.ScaleInRequests++
+		workerPool.State.ScaleOutRequests = 0
 
-	// Setup session to AWS auto scaling service.
-	asgSess := client.NewAWSAsgService(workerPool.Region)
+		if workerPool.State.ScaleInRequests == workerPool.ScalingThreshold {
+			logging.Debug("core/cluster_scaling: cluster scale-in request %v for "+
+				"worker pool %v meets the threshold %v",
+				workerPool.State.ScaleInRequests, workerPool.Name,
+				workerPool.ScalingThreshold)
 
-	// Identify the most recently launched instance and verify it joins the
-	// worker pool in a healthy state. If any failures are detected, retry
-	// up to the configured retry threshold.
-	for state.FailureCount <= workerPool.RetryThreshold {
-		if state.FailureCount > 0 {
-			logging.Info("core/cluster_scaling: attempting to launch a new worker "+
-				"node in worker pool %v, previous node failures: %v", workerPool.Name,
-				state.FailureCount)
+			workerPool.State.ScaleInRequests = 0
+			scale = true
+		} else {
+			logging.Debug("core/cluster_scaling: cluster scale-in request %v for "+
+				"worker pool %v does not meet the threshold %v",
+				workerPool.State.ScaleInRequests, workerPool.Name,
+				workerPool.ScalingThreshold)
 		}
 
-		// Identify the most recently launched instance in the worker pool.
-		newestNode, err := client.GetMostRecentInstance(workerPool.Name,
-			workerPool.Region)
-		if err != nil {
-			logging.Error("core/cluster_scaling: failed to identify the most "+
-				"recently launched instance in worker pool %v: %v",
-				workerPool.Name, err)
+	case structs.ScalingDirectionOut:
+		workerPool.State.ScaleOutRequests++
+		workerPool.State.ScaleInRequests = 0
 
-			// Increment failure count and write state object.
-			state.FailureCount++
-			if err = consulClient.PersistState(state); err != nil {
-				logging.Error("core/cluster_scaling: %v", err)
-			}
-			continue
+		if workerPool.State.ScaleOutRequests == workerPool.ScalingThreshold {
+			logging.Debug("core/cluster_scaling: cluster scale-out request %v for "+
+				"worker pool %v meets the threshold %v",
+				workerPool.State.ScaleOutRequests, workerPool.Name,
+				workerPool.ScalingThreshold)
+
+			workerPool.State.ScaleOutRequests = 0
+			scale = true
+		} else {
+			logging.Debug("core/cluster_scaling: cluster scale-out request %v for "+
+				"worker pool %v does not meet the threshold %v",
+				workerPool.State.ScaleOutRequests, workerPool.Name,
+				workerPool.ScalingThreshold)
 		}
 
-		// Verify the most recently launched instance has completed bootstrapping
-		// and successfully joined the worker pool.
-		if healthy := nomadClient.VerifyNodeHealth(newestNode); healthy {
-			// Reset node failure count once we have a verified healthy worker.
-			state.FailureCount = 0
-
-			// Update the last scaling event timestamp.
-			state.LastScalingEvent = time.Now()
-
-			// Attempt to update state tracking information in Consul.
-			if err = consulClient.PersistState(state); err != nil {
-				logging.Error("core/cluster_scaling: %v", err)
-			}
-
-			return
-		}
-
-		// Increment failure count and write state object.
-		state.FailureCount++
-		logging.Error("core/cluster_scaling: new node %v failed to successfully "+
-			"join worker pool %v, incrementing node failure count to %v and "+
-			"terminating instance", newestNode, workerPool.Name,
-			state.FailureCount)
-
-		// Attempt to update state tracking information in Consul.
-		if err = consulClient.PersistState(state); err != nil {
-			logging.Error("core/cluster_scaling: %v", err)
-		}
-
-		metrics.IncrCounter([]string{"cluster", "scale_out_failed"}, 1)
-
-		// Translate the IP address of the most recently launched instance to the
-		// EC2 instance ID so we can terminate it.
-		instanceID := client.TranslateIptoID(newestNode, workerPool.Region)
-
-		// If we've reached the retry threshold, attempt to detach the last
-		// failed instance and decrement the autoscaling group desired count.
-		if state.FailureCount == workerPool.RetryThreshold {
-			err := client.DetachInstance(workerPool.Name, instanceID, asgSess)
-			if err != nil {
-				logging.Error("core/cluster_scaling: an error occurred while "+
-					"attempting to detach the failed instance %v from the worker pool "+
-					"%v: %v", instanceID, workerPool.Name, err)
-			}
-
-			// Place worker pool in failsafe mode.
-			state.FailsafeMode = true
-
-			// Attempt to update state tracking information in Consul.
-			if err = consulClient.PersistState(state); err != nil {
-				logging.Error("core/cluster_scaling: %v", err)
-			}
-
-			return
-		}
-
-		// Attempt to clean up the most recent instance to allow the auto scaling
-		// group to launch a new one.
-		if err := client.TerminateInstance(instanceID, workerPool.Region); err != nil {
-			logging.Error("core/cluster_scaling: an error occurred while "+
-				"attempting to terminate instance %v from worker pool %v: %v",
-				instanceID, workerPool.Name, err)
-		}
+	default:
+		workerPool.State.ScaleInRequests = 0
+		workerPool.State.ScaleOutRequests = 0
 	}
 
-	return
+	if err := config.ConsulClient.PersistState(workerPool.State); err != nil {
+		logging.Error("core:cluster_scaling: unable to update cluster scaling "+
+			"state to persistent store at path %v: %v",
+			workerPool.State.StatePath, err)
+		scale = false
+	}
+
+	return scale
 }
 
 // CheckCooldownThreshold checks to see if a scaling cooldown threshold has
 // been reached.
-func checkCooldownThreshold(interval int, workerPool string,
-	state *structs.ScalingState) bool {
-
-	if state.LastScalingEvent.IsZero() {
+func checkCooldownThreshold(workerPool *structs.WorkerPool) bool {
+	if workerPool.State.LastScalingEvent.IsZero() {
 		logging.Debug("core/cluster_scaling: no previous scaling operations for "+
 			"worker pool %v have occurred, scaling operations should be permitted.",
-			workerPool)
+			workerPool.Name)
 		return true
 	}
 
 	// Calculate the cooldown threshold.
-	cooldown := state.LastScalingEvent.Add(time.Duration(interval) * time.Second)
+	cooldown := workerPool.State.LastScalingEvent.Add(
+		time.Duration(workerPool.Cooldown) * time.Second)
 
 	if time.Now().Before(cooldown) {
 		logging.Info("core/cluster_scaling: cluster scaling cooldown threshold "+
 			"has not been reached: %v, scaling operations for worker pool %v should "+
-			"not be permitted", cooldown, workerPool)
+			"not be permitted", cooldown, workerPool.Name)
 		return false
 	}
 
 	logging.Debug("core/cluster_scaling: cluster scaling cooldown threshold %v "+
 		"has been reached, scaling operations for worker pool %v should be "+
-		"permitted", cooldown, workerPool)
+		"permitted", cooldown, workerPool.Name)
 
 	return true
 }

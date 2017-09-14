@@ -8,6 +8,9 @@ import (
 // ScalingState provides a state object that represents the state
 // of a scalable worker pool or job group.
 type ScalingState struct {
+	// EligibleNodes tracks nodes marked as eligible for targeted scaling actions
+	EligibleNodes []string `json:"eligible_nodes"`
+
 	// FailsafeAdmin tracks whether failsafe mode is being toggled via the CLI
 	// tools.
 	FailsafeAdmin bool `json:"failsafe_admin"`
@@ -55,6 +58,10 @@ type ScalingState struct {
 	// ScaleOutRequests tracks the number of consecutive times replicator
 	// has indicated the cluster worker pool should be scaled out.
 	ScaleOutRequests int `json:"scaleout_requests"`
+
+	// ScalingDirection tracks the desired scaling direction of the resource,
+	// when a scaling operation is being requested.
+	ScalingDirection string `json:"-"`
 
 	// StatePath stores the path where the object should be persisted.
 	StatePath string `json:"state_path"`

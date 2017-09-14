@@ -21,6 +21,7 @@ func TestNodeDiscovery_ParseConfig(t *testing.T) {
 		"replicator_max",
 		"replicator_min",
 		"replicator_notification_uid",
+		"replicator_provider",
 		"replicator_region",
 		"replicator_worker_pool",
 	}
@@ -47,6 +48,7 @@ func TestNodeDiscovery_ParseConfig(t *testing.T) {
 	meta["replicator_max"] = "3"
 	meta["replicator_min"] = "1"
 	meta["replicator_notification_uid"] = "Test01"
+	meta["replicator_provider"] = "aws"
 	meta["replicator_region"] = "us-east-1"
 
 	// Test that a node with a complete and valid scaling configuration
@@ -184,6 +186,7 @@ func TestNodeDiscovery_Deregister(t *testing.T) {
 					"replicator_max":              "3",
 					"replicator_min":              "1",
 					"replicator_notification_uid": "Test01",
+					"replicator_provider":         "aws",
 					"replicator_region":           "us-east-1",
 					"replicator_worker_pool":      "example-group",
 				},
@@ -196,6 +199,14 @@ func TestNodeDiscovery_Deregister(t *testing.T) {
 		t.Fatalf("an unexpected error occurred while attempting to deregister a " +
 			"node from an existing worker pool")
 	}
+
+	// Copy the pointer reference to our scaling provider.
+	expectedRegistry.WorkerPools["example-group"].ScalingProvider =
+		nodeRegistry.WorkerPools["example-group"].ScalingProvider
+
+	// Copy node registration records.
+	expectedRegistry.WorkerPools["example-group"].NodeRegistrations =
+		nodeRegistry.WorkerPools["example-group"].NodeRegistrations
 
 	// Validate the node registry matches our desired state after deregistration
 	if !reflect.DeepEqual(nodeRegistry, expectedRegistry) {
@@ -250,6 +261,7 @@ func TestNodeDiscovery_RegisterNode(t *testing.T) {
 					"replicator_max":              "3",
 					"replicator_min":              "1",
 					"replicator_notification_uid": "Test01",
+					"replicator_provider":         "aws",
 					"replicator_region":           "us-east-1",
 					"replicator_worker_pool":      "example-group",
 				},
@@ -273,6 +285,14 @@ func TestNodeDiscovery_RegisterNode(t *testing.T) {
 	if err = Register(nodeRecord, nodeConfig, nodeRegistry); err != nil {
 		t.Fatalf("an unexpected error occurred during registration: %v", err)
 	}
+
+	// Copy the pointer reference to our scaling provider.
+	expected.WorkerPools["example-group"].ScalingProvider =
+		nodeRegistry.WorkerPools["example-group"].ScalingProvider
+
+	// Copy node registration records.
+	expected.WorkerPools["example-group"].NodeRegistrations =
+		nodeRegistry.WorkerPools["example-group"].NodeRegistrations
 
 	// Validate the dynamic node registry matches our desired state.
 	if !reflect.DeepEqual(nodeRegistry, expected) {
@@ -302,6 +322,7 @@ func TestNodeDiscovery_RegisterNode(t *testing.T) {
 			"replicator_max":              "3",
 			"replicator_min":              "1",
 			"replicator_notification_uid": "Test01",
+			"replicator_provider":         "aws",
 			"replicator_region":           "us-east-1",
 			"replicator_worker_pool":      "example-group",
 		},
@@ -309,6 +330,11 @@ func TestNodeDiscovery_RegisterNode(t *testing.T) {
 
 	// Register second node to existing worker pool.
 	Register(nodeRecord, nodeConfig, nodeRegistry)
+
+	// Copy the pointer reference to our scaling provider.
+	expected.WorkerPools["example-group"].ScalingProvider =
+		nodeRegistry.WorkerPools["example-group"].ScalingProvider
+
 	// Validate the dynamic node registry matches our desired state.
 	if !reflect.DeepEqual(nodeRegistry, expected) {
 		t.Fatalf("expected \n%#v\n\n, got \n\n%#v\n\n", expected, nodeRegistry)
@@ -335,6 +361,7 @@ func TestNodeDiscovery_RegisterNode(t *testing.T) {
 	// Confirm worker pool is updated to reflect changes.
 	workerPool := nodeRegistry.WorkerPools["example-group"]
 	expectedPool := expected.WorkerPools["example-group"]
+
 	if !reflect.DeepEqual(workerPool, expectedPool) {
 		t.Fatalf("expected \n%#v\n\n, got \n\n%#v\n\n", expectedPool, workerPool)
 	}
@@ -343,7 +370,7 @@ func TestNodeDiscovery_RegisterNode(t *testing.T) {
 	// we attempt to register a node in a down state.
 	nodeRegistry = newNodeRegistry()
 	nodeRecord.Status = structs.NodeStatusDown
-	if err := Register(nodeRecord, nodeConfig, nodeRegistry); err == nil {
+	if err = Register(nodeRecord, nodeConfig, nodeRegistry); err == nil {
 		t.Fatalf("no exception was raised when we attempted to register " +
 			"a node in a down state")
 	}
@@ -353,9 +380,25 @@ func TestNodeDiscovery_RegisterNode(t *testing.T) {
 	nodeRegistry = newNodeRegistry()
 	nodeRecord.Status = structs.NodeStatusReady
 	nodeRecord.Drain = true
-	if err := Register(nodeRecord, nodeConfig, nodeRegistry); err == nil {
+	if err = Register(nodeRecord, nodeConfig, nodeRegistry); err == nil {
 		t.Fatalf("no exception was raised when we attempted to register " +
 			"a node with drain mode enabled")
+	}
+
+	// Reset node registry object and confirm an exception is raised when
+	// we attempt to register a node with an invalid scaling provider.
+	nodeRegistry = newNodeRegistry()
+	nodes = mockNodes(false, false, structs.NodeStatusReady)
+	nodeRecord = mockNode(nodes[0])
+	nodeRecord.Meta["replicator_provider"] = "foo"
+	nodeConfig, err = ProcessNodeConfig(nodeRecord)
+	if err != nil {
+		t.Fatalf("an unexpected exception occured while processing node "+
+			"configuration: %v", err)
+	}
+	if err := Register(nodeRecord, nodeConfig, nodeRegistry); err == nil {
+		t.Fatalf("no exception was raised when we attempted to register " +
+			"a node with an invalid scaling provider configured")
 	}
 }
 
@@ -410,6 +453,7 @@ func mockNode(node *api.NodeListStub) (nodeRecord *api.Node) {
 	meta["replicator_max"] = "3"
 	meta["replicator_min"] = "1"
 	meta["replicator_notification_uid"] = "Test01"
+	meta["replicator_provider"] = "aws"
 	meta["replicator_region"] = "us-east-1"
 	meta["replicator_worker_pool"] = "example-group"
 

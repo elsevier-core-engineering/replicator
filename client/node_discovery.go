@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/elsevier-core-engineering/replicator/cloudprovider"
 	"github.com/elsevier-core-engineering/replicator/helper"
 	"github.com/elsevier-core-engineering/replicator/logging"
 	"github.com/elsevier-core-engineering/replicator/replicator/structs"
@@ -77,7 +78,11 @@ func (c *nomadClient) NodeWatcher(nodeRegistry *structs.NodeRegistry) {
 					continue
 				}
 
-				Register(nodeRecord, nodeConfig, nodeRegistry)
+				if err := Register(nodeRecord, nodeConfig, nodeRegistry); err != nil {
+					logging.Error("client/node_discovery: an error occurred while "+
+						"attempting to register node %v: %v", nodeRecord.ID, err)
+				}
+
 				if !nodeConfig.ScalingEnabled {
 					logging.Debug("client/node_discovery: scaling has been disabled "+
 						"on node %v, initiating deregistration of the node", node.ID)
@@ -136,6 +141,7 @@ func ProcessNodeConfig(node *nomad.Node) (pool *structs.WorkerPool, err error) {
 		"replicator_max",
 		"replicator_min",
 		"replicator_notification_uid",
+		"replicator_provider",
 		"replicator_region",
 		"replicator_worker_pool",
 	}
@@ -184,7 +190,7 @@ func ProcessNodeConfig(node *nomad.Node) (pool *structs.WorkerPool, err error) {
 // Register is responsible for registering a newly discovered worker pool
 // or registering a node with an previously discovered worker pool.
 func Register(node *nomad.Node, workerPool *structs.WorkerPool,
-	nodeRegistry *structs.NodeRegistry) (err error) {
+	nodeRegistry *structs.NodeRegistry) error {
 
 	// Decline to register the node if it is not in a ready state.
 	if node.Status != structs.NodeStatusReady {
@@ -232,6 +238,9 @@ func Register(node *nomad.Node, workerPool *structs.WorkerPool,
 				logging.Debug("client/node_discovery: registering node %v under "+
 					"previously discovered worker pool %v", node.ID, workerPool.Name)
 
+				// Add node registration record to track node discovery time.
+				existingPool.NodeRegistrations[node.ID] = time.Now()
+
 				// Register the node within the worker pool record.
 				existingPool.Nodes[node.ID] = node
 
@@ -243,18 +252,30 @@ func Register(node *nomad.Node, workerPool *structs.WorkerPool,
 		return nil
 	}
 
+	// Add node registration record to track node discovery time.
+	workerPool.NodeRegistrations[node.ID] = time.Now()
+
 	// Add the node to the worker pool.
 	workerPool.Nodes[node.ID] = node
 
+	// Register the appropriate scaling provider with the worker pool.
+	scalingProvider, err := cloudprovider.NewScalingProvider(node.Meta)
+	if err != nil {
+		return fmt.Errorf("failed to initialize scaling provider for worker pool "+
+			"%v: %v", workerPool.Name, err)
+	}
+	workerPool.ScalingProvider = scalingProvider
+
 	logging.Debug("client/node_discovery: registering node %v with new worker "+
-		"pool %v", node.ID, workerPool.Name)
+		"pool %v with registration timestamp %v", node.ID, workerPool.Name,
+		workerPool.NodeRegistrations[node.ID])
 
 	// Add an observed node record and register the node with the
 	// worker pool.
 	nodeRegistry.RegisteredNodes[node.ID] = workerPool.Name
 	nodeRegistry.WorkerPools[workerPool.Name] = workerPool
 
-	return
+	return nil
 }
 
 // Deregister is responsible for removing a node from a worker pool record.
@@ -280,6 +301,7 @@ func Deregister(node string, nodeRegistry *structs.NodeRegistry) (err error) {
 	// Remove the observed node record and deregister the node from the
 	// worker pool.
 	delete(workerPool.Nodes, node)
+	delete(workerPool.NodeRegistrations, node)
 	delete(nodeRegistry.RegisteredNodes, node)
 
 	// If the worker pool has no registered nodes left, deregister the

@@ -1,10 +1,6 @@
 package client
 
 import (
-	// "fmt"
-	// "math"
-	// "time"
-
 	"github.com/dariubs/percent"
 	"github.com/elsevier-core-engineering/replicator/logging"
 	"github.com/elsevier-core-engineering/replicator/replicator/structs"
@@ -57,7 +53,6 @@ func (c *nomadClient) EvaluatePoolScaling(capacity *structs.ClusterCapacity,
 		return scale, err
 	}
 
-	scale = true
 	logging.Debug("client/cluster_scaling: cluster scaling operation (%v) for "+
 		"worker pool %v passes the safety check and should be permitted",
 		capacity.ScalingDirection, workerPool.Name)
@@ -256,39 +251,7 @@ func (c *nomadClient) ClusterScalingSafe(capacity *structs.ClusterCapacity,
 		poolUsedCapacity = capacity.UsedCapacity.MemoryMB
 	}
 
-	// Instantiate a new AWS auto scaling service object.
-	asgService := NewAWSAsgService(workerPool.Region)
-
-	// Retrieve ASG configuration so we can check min/max/desired counts
-	// against the desired scaling action.
-	asg, err := DescribeScalingGroup(workerPool.Name, asgService)
-	if err != nil {
-		logging.Error("client/cluster_scaling: unable to retrieve worker pool ASG "+
-			"configuration to evaluate constraints: %v", err)
-		return
-	}
-
-	// If we failed to get exactly one ASG, raise an error and halt processing.
-	if len(asg.AutoScalingGroups) != 1 {
-		logging.Error("client/cluster_scaling: the attempt to retrieve worker "+
-			"pool ASG configuration failed to return a single result: results %v",
-			len(asg.AutoScalingGroups))
-		return
-	}
-
-	// Get the worker pool ASG min/max/desired constraints.
-	desiredCap := *asg.AutoScalingGroups[0].DesiredCapacity
-	maxSize := *asg.AutoScalingGroups[0].MaxSize
-	minSize := *asg.AutoScalingGroups[0].MinSize
-
 	if capacity.ScalingDirection == ScalingDirectionIn {
-		// If scaling in would violate the ASG min count, fail the safety check.
-		if desiredCap-1 < minSize {
-			logging.Debug("client/cluster_scaling: cluster scale-in operation " +
-				"would violate the worker pool ASG min count")
-			return
-		}
-
 		// Determine if removing a node would violate safety thresholds or
 		// declared minimums.
 		if (capacity.NodeCount <= 1) || ((capacity.NodeCount - 1) < workerPool.Min) {
@@ -323,13 +286,6 @@ func (c *nomadClient) ClusterScalingSafe(capacity *structs.ClusterCapacity,
 			return
 		}
 	} else if capacity.ScalingDirection == ScalingDirectionOut {
-		// If scaling out would violate the ASG max count, fail the safety check.
-		if desiredCap+1 > maxSize {
-			logging.Debug("client/cluster_scaling: cluster scale-out operation " +
-				"would violate the worker pool ASG max count")
-			return
-		}
-
 		// If scaling out would violate the Replicator max count, fail the safety
 		// check.
 		if (capacity.NodeCount + 1) > workerPool.Max {

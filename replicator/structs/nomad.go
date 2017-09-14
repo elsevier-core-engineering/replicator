@@ -11,6 +11,13 @@ const (
 	NodeStatusDown  = "down"
 )
 
+// Scaling direction types indicate the allowed scaling actions.
+const (
+	ScalingDirectionOut  = "Out"
+	ScalingDirectionIn   = "In"
+	ScalingDirectionNone = "None"
+)
+
 // NomadClient exposes all API methods needed to interact with the Nomad API,
 // evaluate cluster capacity and allocations and make scaling decisions.
 type NomadClient interface {

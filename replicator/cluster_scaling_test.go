@@ -24,31 +24,37 @@ func TestClusterScaling_scalingThreshold(t *testing.T) {
 	workerPool.ScalingThreshold = 3
 
 	state.StatePath = "replicator/config/state/nodes/" + workerPool.Name
+	workerPool.State = state
 
 	// Check ScaleOut scenarios.
-	state.ScaleOutRequests = 2
-	if !checkPoolScalingThreshold(state, client.ScalingDirectionOut, workerPool, c) {
+	workerPool.State.ScaleOutRequests = 2
+	workerPool.State.ScalingDirection = structs.ScalingDirectionOut
+	if !checkPoolScalingThreshold(workerPool, c) {
 		t.Fatal("expected ClusterScaleOut to answer true but got false")
 	}
 
-	state.ScaleOutRequests = 1
-	if checkPoolScalingThreshold(state, client.ScalingDirectionOut, workerPool, c) {
+	workerPool.State.ScaleOutRequests = 1
+	workerPool.State.ScalingDirection = structs.ScalingDirectionOut
+	if checkPoolScalingThreshold(workerPool, c) {
 		t.Fatal("expected ClusterScaleOut to answer false but got true")
 	}
 
 	// Check ScaleIn scenarios.
-	state.ScaleInRequests = 2
-	if !checkPoolScalingThreshold(state, client.ScalingDirectionIn, workerPool, c) {
+	workerPool.State.ScaleInRequests = 2
+	workerPool.State.ScalingDirection = structs.ScalingDirectionIn
+	if !checkPoolScalingThreshold(workerPool, c) {
 		t.Fatal("expected ClusterScaleIn to answer true but got false")
 	}
 
-	state.ScaleInRequests = 1
-	if checkPoolScalingThreshold(state, client.ScalingDirectionIn, workerPool, c) {
+	workerPool.State.ScaleInRequests = 1
+	workerPool.State.ScalingDirection = structs.ScalingDirectionIn
+	if checkPoolScalingThreshold(workerPool, c) {
 		t.Fatal("expected ClusterScaleIn to answer false but got true")
 	}
 
 	// Check the default return and state setting.
-	if checkPoolScalingThreshold(state, client.ScalingDirectionNone, workerPool, c) {
+	workerPool.State.ScalingDirection = structs.ScalingDirectionNone
+	if checkPoolScalingThreshold(workerPool, c) {
 		t.Fatal("expected ClusterScalingNone to answer false but got true")
 	}
 

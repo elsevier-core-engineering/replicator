@@ -49,7 +49,7 @@ func (r *Runner) Start() {
 
 	if !r.config.ClusterScalingDisable {
 		// Setup the node registry and initiate worker pool and node discovery.
-		nodeRegistry := newNodeRegistry()
+		nodeRegistry := structs.NewNodeRegistry()
 		go r.config.NomadClient.NodeWatcher(nodeRegistry)
 
 		// Launch our cluster scaling main ticker function

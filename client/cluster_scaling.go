@@ -2,7 +2,6 @@ package client
 
 import (
 	"github.com/dariubs/percent"
-	nomad "github.com/hashicorp/nomad/api"
 	nomadStructs "github.com/hashicorp/nomad/nomad/structs"
 
 	"github.com/elsevier-core-engineering/replicator/logging"
@@ -134,7 +133,7 @@ func (c *nomadClient) calculatePoolCapacity(capacity *structs.ClusterCapacity,
 func (c *nomadClient) calculatePoolConsumed(capacity *structs.ClusterCapacity,
 	workerPool *structs.WorkerPool) (err error) {
 
-	q := &nomad.QueryOptions{}
+	q := c.queryOptions()
 
 	for node := range workerPool.Nodes {
 		allocations, _, err := c.nomad.Nodes().Allocations(node, q)
@@ -189,7 +188,7 @@ func (c *nomadClient) calculateScalingReserve(capacity *structs.ClusterCapacity,
 			continue
 		}
 
-		job, _, err := c.nomad.Jobs().Info(jobName, &nomad.QueryOptions{})
+		job, _, err := c.nomad.Jobs().Info(jobName, c.queryOptions())
 		if err != nil {
 			return err
 		}
@@ -213,7 +212,7 @@ func (c *nomadClient) calculateScalingReserve(capacity *structs.ClusterCapacity,
 func (c *nomadClient) checkJobPlacement(job string,
 	workerPool *structs.WorkerPool) bool {
 
-	allocs, _, err := c.nomad.Jobs().Allocations(job, false, &nomad.QueryOptions{})
+	allocs, _, err := c.nomad.Jobs().Allocations(job, false, c.queryOptions())
 	if err != nil {
 		logging.Error("client/nomad: an error occurred while attempting to check "+
 			"if job %v is running on worker pool %v: %v", job, workerPool.Name, err)

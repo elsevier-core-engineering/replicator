@@ -56,7 +56,7 @@ func (c *nomadClient) NodeWatcher(nodeRegistry *structs.NodeRegistry) {
 			case structs.NodeStatusReady:
 				// Retrieve detailed node information to obtain meta configuration
 				// parameters from the client stanza of the agent.
-				nodeRecord, _, err := c.nomad.Nodes().Info(node.ID, &nomad.QueryOptions{})
+				nodeRecord, _, err := c.nomad.Nodes().Info(node.ID, c.queryOptions())
 				if err != nil {
 					logging.Error("client/node_discovery: an error occurred while "+
 						"attempting to retrieve node configuration details: %v", err)

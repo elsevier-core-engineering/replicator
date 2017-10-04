@@ -54,7 +54,7 @@ func NewNomadClient(addr string) (structs.NomadClient, error) {
 // NodeReverseLookup provides a method to get the ID of the worker pool node
 // running a given allocation.
 func (c *nomadClient) NodeReverseLookup(allocID string) (node string, err error) {
-	resp, _, err := c.nomad.Allocations().Info(allocID, &nomad.QueryOptions{})
+	resp, _, err := c.nomad.Allocations().Info(allocID, c.queryOptions())
 	if err != nil {
 		return
 	}
@@ -140,7 +140,7 @@ func (c *nomadClient) LeastAllocatedNode(capacity *structs.ClusterCapacity,
 
 	// In order to perform downscaling of the cluster we need to have access
 	// to the nodes IP address so  the AWS instance-id can be inferred.
-	resp, _, err := c.nomad.Nodes().Info(nodeID, &nomad.QueryOptions{})
+	resp, _, err := c.nomad.Nodes().Info(nodeID, c.queryOptions())
 	if err != nil {
 		logging.Error("client/nomad: unable to determine nomad node IP address: %v", err)
 	} else {
@@ -161,7 +161,7 @@ func (c *nomadClient) DrainNode(nodeID string) (err error) {
 
 	// Validate node has been placed in drain mode; fail fast if the node
 	// failed to enter drain mode.
-	resp, _, err := c.nomad.Nodes().Info(nodeID, &nomad.QueryOptions{})
+	resp, _, err := c.nomad.Nodes().Info(nodeID, c.queryOptions())
 	if (err != nil) || (resp.Drain != true) {
 		return err
 	}
@@ -182,7 +182,7 @@ func (c *nomadClient) DrainNode(nodeID string) (err error) {
 			activeAllocations := 0
 
 			// Get allocations assigned to the specified node.
-			allocations, _, err := c.nomad.Nodes().Allocations(nodeID, &nomad.QueryOptions{})
+			allocations, _, err := c.nomad.Nodes().Allocations(nodeID, c.queryOptions())
 			if err != nil {
 				return err
 			}
@@ -209,7 +209,7 @@ func (c *nomadClient) DrainNode(nodeID string) (err error) {
 // GetTaskGroupResources finds the defined resource requirements for a
 // given Job.
 func (c *nomadClient) GetTaskGroupResources(jobName string, groupPolicy *structs.GroupScalingPolicy) error {
-	jobs, _, err := c.nomad.Jobs().Info(jobName, &nomad.QueryOptions{})
+	jobs, _, err := c.nomad.Jobs().Info(jobName, c.queryOptions())
 
 	if err != nil {
 		return err
@@ -236,7 +236,7 @@ func (c *nomadClient) EvaluateJobScaling(jobName string, jobScalingPolicies []*s
 			return
 		}
 
-		allocs, _, err := c.nomad.Jobs().Allocations(jobName, false, &nomad.QueryOptions{})
+		allocs, _, err := c.nomad.Jobs().Allocations(jobName, false, c.queryOptions())
 		if err != nil {
 			return err
 		}
@@ -276,7 +276,7 @@ func (c *nomadClient) GetJobAllocations(allocs []*nomad.AllocationListStub, gsp 
 		if (allocationStub.ClientStatus == nomadStructs.AllocClientStatusRunning) &&
 			(allocationStub.DesiredStatus == nomadStructs.AllocDesiredStatusRun) {
 
-			if alloc, _, err := c.nomad.Allocations().Info(allocationStub.ID, &nomad.QueryOptions{}); err == nil && alloc != nil {
+			if alloc, _, err := c.nomad.Allocations().Info(allocationStub.ID, c.queryOptions()); err == nil && alloc != nil {
 				cpuPercent, memPercent := c.GetAllocationStats(alloc, gsp)
 				cpuPercentAll += cpuPercent
 				memPercentAll += memPercent
@@ -314,7 +314,7 @@ func (c *nomadClient) VerifyNodeHealth(nodeIP string) (healthy bool) {
 			return
 		case <-ticker.C:
 			// Retrieve a list of all worker nodes within the cluster.
-			nodes, _, err := c.nomad.Nodes().List(&nomad.QueryOptions{})
+			nodes, _, err := c.nomad.Nodes().List(c.queryOptions())
 			if err != nil {
 				return
 			}
@@ -327,7 +327,7 @@ func (c *nomadClient) VerifyNodeHealth(nodeIP string) (healthy bool) {
 				}
 
 				// Retrieve detailed information about the worker node.
-				resp, _, err := c.nomad.Nodes().Info(node.ID, &nomad.QueryOptions{})
+				resp, _, err := c.nomad.Nodes().Info(node.ID, c.queryOptions())
 				if err != nil {
 					logging.Error("client/nomad: an error occurred while attempting to "+
 						"retrieve details about node %v: %v", node.ID, err)
@@ -352,7 +352,7 @@ func (c *nomadClient) VerifyNodeHealth(nodeIP string) (healthy bool) {
 // GetAllocationStats discovers the resources consumed by a particular Nomad
 // allocation.
 func (c *nomadClient) GetAllocationStats(allocation *nomad.Allocation, scalingPolicy *structs.GroupScalingPolicy) (float64, float64) {
-	stats, err := c.nomad.Allocations().Stats(allocation, &nomad.QueryOptions{})
+	stats, err := c.nomad.Allocations().Stats(allocation, c.queryOptions())
 	if err != nil {
 		logging.Error("client/nomad: failed to retrieve allocation statistics from client %v: %v\n", allocation.NodeID, err)
 		return 0, 0
@@ -364,6 +364,11 @@ func (c *nomadClient) GetAllocationStats(allocation *nomad.Allocation, scalingPo
 	return percent.PercentOf(int(math.Floor(cs.TotalTicks)),
 			scalingPolicy.Tasks.Resources.CPUMHz), percent.PercentOf(int((ms.RSS / bytesPerMegabyte)),
 			scalingPolicy.Tasks.Resources.MemoryMB)
+}
+
+// queryOptions returns a copy of default nomad query options set in NewNomadClient
+func (c *nomadClient) queryOptions() (queryOptions *nomad.QueryOptions) {
+	return &nomad.QueryOptions{AllowStale: true}
 }
 
 // MaxAllowedClusterUtilization calculates the maximum allowed cluster utilization after

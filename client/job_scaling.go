@@ -23,7 +23,7 @@ func (c *nomadClient) JobGroupScale(jobName string, group *structs.GroupScalingP
 
 	// In order to scale the job, we need information on the current status of the
 	// running job from Nomad.
-	jobResp, _, err := c.nomad.Jobs().Info(jobName, &nomad.QueryOptions{})
+	jobResp, _, err := c.nomad.Jobs().Info(jobName, c.queryOptions())
 
 	if err != nil {
 		logging.Error("client/job_scaling: unable to determine job info of %v: %v", jobName, err)

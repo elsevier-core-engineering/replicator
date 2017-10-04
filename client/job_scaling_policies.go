@@ -66,7 +66,7 @@ func (c *nomadClient) JobWatcher(jobScalingPolicies *structs.JobScalingPolicies)
 // their meta paramerters scaling policy status.
 func (c *nomadClient) jobScalingPolicyProcessor(jobID string, scaling *structs.JobScalingPolicies) {
 
-	jobInfo, _, err := c.nomad.Jobs().Info(jobID, &nomad.QueryOptions{})
+	jobInfo, _, err := c.nomad.Jobs().Info(jobID, c.queryOptions())
 	if err != nil {
 		logging.Error("client/job_scaling_policies: unable to call Nomad job info: %v", err)
 	}

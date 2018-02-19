@@ -9,6 +9,8 @@ import (
 	"github.com/elsevier-core-engineering/replicator/replicator/structs"
 )
 
+var bytesPerMB = uint64(1000000)
+
 // EvaluatePoolScaling evaluates a worker pool capacity and utilization,
 // and determines whether a scaling operation is required and safe to
 // implement.
@@ -137,33 +139,51 @@ func (c *nomadClient) calculatePoolConsumed(capacity *structs.ClusterCapacity,
 	q := &nomad.QueryOptions{}
 
 	for node := range workerPool.Nodes {
-		allocations, _, err := c.nomad.Nodes().Allocations(node, q)
+		stats, err := c.nomad.Nodes().Stats(node, q)
 		if err != nil {
 			return err
 		}
 
+		info, _, err := c.nomad.Nodes().Info(node, q)
+
+		if err != nil {
+			return err
+		}
 		// Create a new node allocation object.
 		nodeInfo := &structs.NodeAllocation{
 			NodeID:       node,
 			UsedCapacity: structs.AllocationResources{},
 		}
 
-		for _, nodeAlloc := range allocations {
-			if (nodeAlloc.ClientStatus == nomadStructs.TaskStateRunning) &&
-				(nodeAlloc.DesiredStatus == nomadStructs.AllocDesiredStatusRun) {
+		// Track the resources consumed by this worker node.
+		memUsedMB := int(stats.Memory.Used / bytesPerMB)
 
-				// Add the consumed resources to total worker pool consumption.
-				capacity.UsedCapacity.CPUMHz += *nodeAlloc.Resources.CPU
-				capacity.UsedCapacity.MemoryMB += *nodeAlloc.Resources.MemoryMB
-				capacity.UsedCapacity.DiskMB += *nodeAlloc.Resources.DiskMB
+		capacity.UsedCapacity.MemoryMB += memUsedMB
+		nodeInfo.UsedCapacity.MemoryMB += memUsedMB
 
-				// Track the resources consumed by this worker node.
-				nodeInfo.UsedCapacity.CPUMHz += *nodeAlloc.Resources.CPU
-				nodeInfo.UsedCapacity.MemoryMB += *nodeAlloc.Resources.MemoryMB
-				nodeInfo.UsedCapacity.DiskMB += *nodeAlloc.Resources.DiskMB
+		// aggregate the disk usage
+		for _, disk := range stats.DiskStats {
+			diskUsedMB := int(disk.Used / bytesPerMB)
 
-			}
+			capacity.UsedCapacity.DiskMB += diskUsedMB
+			nodeInfo.UsedCapacity.DiskMB += diskUsedMB
 		}
+
+		// aggregate the cpu usage
+		perCoreUsage := float64(0)
+		for _, cpu := range stats.CPU {
+			perCoreUsage += cpu.System
+			perCoreUsage += cpu.User
+		}
+
+		// divide the total core utilization by the number of cores
+		usedPercentage := perCoreUsage / float64(len(stats.CPU))
+
+		// calculate the total MHz used based on node resources and used percent
+		usedMHz := int(float64(*info.Resources.CPU) * (usedPercentage / 100.0))
+
+		capacity.UsedCapacity.CPUMHz += usedMHz
+		nodeInfo.UsedCapacity.CPUMHz += usedMHz
 
 		// Add the node allocation record to the cluster status object.
 		capacity.NodeAllocations = append(capacity.NodeAllocations, nodeInfo)

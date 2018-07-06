@@ -1,8 +1,6 @@
 package structs
 
 import (
-	"net"
-
 	"github.com/elsevier-core-engineering/replicator/notifier"
 )
 
@@ -67,12 +65,6 @@ type Config struct {
 	// Notification contains Replicators notification configuration params and
 	// initialized backends.
 	Notification *Notification `mapstructure:"notification"`
-
-	RPCAddr      *net.TCPAddr
-	RPCAdvertise *net.TCPAddr
-
-	// RPCPort is the RPC port on which Replicator will run and advertise.
-	RPCPort int `mapstructure:"rpc_port"`
 
 	// ScalingConcurrency sets the maximum number of concurrent scaling
 	// operations allowed for both job and worker pool scaling.
@@ -161,10 +153,6 @@ func (c *Config) Merge(b *Config) *Config {
 
 	if b.HTTPPort != "" {
 		config.HTTPPort = b.HTTPPort
-	}
-
-	if b.RPCPort > 0 {
-		config.RPCPort = b.RPCPort
 	}
 
 	if b.ScalingConcurrency > 0 {

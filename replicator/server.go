@@ -12,6 +12,12 @@ import (
 	"github.com/elsevier-core-engineering/replicator/replicator/structs"
 )
 
+var (
+	// DefaultRPCAddr is the default bind address and port for the Replicator RPC
+	// listener.
+	DefaultRPCAddr = &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1314}
+)
+
 // Server is the Replicator server that is responsible for running the API and
 // all scaling tasks.
 type Server struct {
@@ -89,7 +95,7 @@ func NewServer(config *structs.Config) (*Server, error) {
 
 	// Start the RPC listeners
 	go s.listen()
-	logging.Info("core/server: the RPC server has started and is listening at %v", s.config.RPCAddr)
+	logging.Info("core/server: the RPC server has started and is listening at %v", DefaultRPCAddr)
 
 	return s, nil
 }
@@ -175,7 +181,7 @@ func (s *Server) setupRPC() error {
 	s.endpoints.Status = &Status{s}
 	s.rpcServer.Register(s.endpoints.Status)
 
-	list, err := net.ListenTCP("tcp", s.config.RPCAddr)
+	list, err := net.ListenTCP("tcp", DefaultRPCAddr)
 	if err != nil {
 		return err
 	}

@@ -3,7 +3,6 @@ package base
 import (
 	"fmt"
 	"io"
-	"net"
 	"os"
 	"path/filepath"
 	"sort"
@@ -22,12 +21,6 @@ const (
 	LocalNomadAddress  = "http://localhost:4646"
 )
 
-var (
-	// DefaultRPCAddr is the default bind address and port for the Replicator RPC
-	// listener.
-	DefaultRPCAddr = &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1314}
-)
-
 // DefaultConfig returns a default configuration struct with sane defaults.
 func DefaultConfig() *structs.Config {
 
@@ -40,8 +33,6 @@ func DefaultConfig() *structs.Config {
 		ClusterScalingInterval: 10,
 		JobScalingInterval:     10,
 		HTTPPort:               DefaultHTTPPort,
-		RPCPort:                DefaultRPCPort,
-		RPCAddr:                DefaultRPCAddr,
 		ScalingConcurrency:     10,
 
 		Telemetry:    &structs.Telemetry{},
@@ -62,8 +53,6 @@ func DevConfig() *structs.Config {
 		ClusterScalingInterval: 10,
 		JobScalingInterval:     10,
 		HTTPPort:               DefaultHTTPPort,
-		RPCPort:                DefaultRPCPort,
-		RPCAddr:                DefaultRPCAddr,
 		ScalingConcurrency:     10,
 
 		Telemetry:    &structs.Telemetry{},

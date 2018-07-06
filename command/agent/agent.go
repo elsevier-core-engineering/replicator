@@ -2,7 +2,6 @@ package agent
 
 import (
 	"fmt"
-	"net"
 	"os"
 	"os/signal"
 	"strings"
@@ -164,7 +163,6 @@ func (c *Command) parseFlags() *structs.Config {
 	flags.BoolVar(&cliConfig.ClusterScalingDisable, "cluster-scaling-disable", false, "")
 	flags.BoolVar(&cliConfig.JobScalingDisable, "job-scaling-disable", false, "")
 	flags.StringVar(&cliConfig.HTTPPort, "http-port", "", "")
-	flags.IntVar(&cliConfig.RPCPort, "rpc-port", 0, "")
 
 	// Telemetry configuration flags
 	flags.StringVar(&cliConfig.Telemetry.StatsdAddress, "statsd-address", "", "")
@@ -276,10 +274,6 @@ func (c *Command) setupNotifier(config *structs.Notification) (err error) {
 // initialzeAgent setups up a number of configuration clients which depend on
 // the merged configuration.
 func (c *Command) initialzeAgent(config *structs.Config) (err error) {
-
-	if config.BindAddress != base.DefaultBindAddr || config.RPCPort != base.DefaultRPCPort {
-		config.RPCAddr = &net.TCPAddr{IP: net.ParseIP(config.BindAddress), Port: config.RPCPort}
-	}
 
 	// Setup telemetry
 	if err = c.setupTelemetry(config.Telemetry); err != nil {

@@ -74,7 +74,7 @@ The `docker` driver supports the following configuration in the job spec.  Only
       command = "my-command"
     }
     ```
-    
+
 * `dns_search_domains` - (Optional) A list of DNS search domains for the container
   to use.
 
@@ -227,6 +227,19 @@ The `docker` driver supports the following configuration in the job spec.  Only
 
 * `shm_size` - (Optional) The size (bytes) of /dev/shm for the container.
 
+* `storage_opt` - (Optional) A key-value map of storage options set to the containers on start.
+  This overrides the [host dockerd configuration](https://docs.docker.com/engine/reference/commandline/dockerd/#options-per-storage-driver).
+  For example:
+
+
+    ```hcl
+    config {
+      storage_opt = {
+        size = "40G"
+      }
+    }
+    ```
+
 * `SSL` - (Optional) If this is set to true, Nomad uses SSL to talk to the
   repository. The default value is `true`. **Deprecated as of 0.5.3**
 
@@ -361,7 +374,12 @@ The `docker` driver supports the following configuration in the job spec.  Only
   soft limiting is used and containers are able to burst above their CPU limit
   when there is idle capacity.
 
-* `advertise_ipv6_address` - (Optional) `true` or `false` (default). Use the container's 
+* `cpu_cfs_period` - (Optional) An integer value that specifies the duration in microseconds of the period
+  during which the CPU usage quota is measured. The default is 100000 (0.1 second) and the maximum allowed
+  value is 1000000 (1 second). See [here](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/6/html/resource_management_guide/sec-cpu#sect-cfs)
+  for more details.
+
+* `advertise_ipv6_address` - (Optional) `true` or `false` (default). Use the container's
    IPv6 address (GlobalIPv6Address in Docker) when registering services and checks.
    See [IPv6 Docker containers](/docs/job-specification/service.html#IPv6 Docker containers) for details.
 
@@ -578,7 +596,7 @@ of the Linux Kernel and Docker daemon.
 ## Client Configuration
 
 The `docker` driver has the following [client configuration
-options](/docs/agent/configuration/client.html#options):
+options](/docs/configuration/client.html#options):
 
 * `docker.endpoint` - If using a non-standard socket, HTTP or another location,
   or if TLS is being used, `docker.endpoint` must be set. If unset, Nomad will
@@ -639,10 +657,10 @@ options](/docs/agent/configuration/client.html#options):
 
 * `docker.caps.whitelist`: A list of allowed Linux capabilities. Defaults to
   `"CHOWN,DAC_OVERRIDE,FSETID,FOWNER,MKNOD,NET_RAW,SETGID,SETUID,SETFCAP,SETPCAP,NET_BIND_SERVICE,SYS_CHROOT,KILL,AUDIT_WRITE"`,
-  which is the list of capabilities allowed by docker by default, as 
+  which is the list of capabilities allowed by docker by default, as
   [defined here](https://docs.docker.com/engine/reference/run/#runtime-privilege-and-linux-capabilities).
-  Allows the operator to control which capabilities can be obtained by 
-  tasks using `cap_add` and `cap_drop` options. Supports the value `"ALL"` as a 
+  Allows the operator to control which capabilities can be obtained by
+  tasks using `cap_add` and `cap_drop` options. Supports the value `"ALL"` as a
   shortcut for whitelisting all capabilities.
 
 * `docker.cleanup.container`: Defaults to `true`. This option can be used to

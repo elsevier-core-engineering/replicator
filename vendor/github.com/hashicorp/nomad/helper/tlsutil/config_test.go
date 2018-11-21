@@ -388,8 +388,8 @@ func TestConfig_OutgoingTLS_PreferServerCipherSuites(t *testing.T) {
 	}
 	{
 		conf := &Config{
-			VerifyOutgoing: true,
-			CAFile:         cacert,
+			VerifyOutgoing:           true,
+			CAFile:                   cacert,
 			PreferServerCipherSuites: true,
 		}
 		tlsConfig, err := conf.OutgoingTLSConfig()
@@ -722,28 +722,35 @@ func TestConfig_IncomingTLS_TLSCipherSuites(t *testing.T) {
 	}
 }
 
+// This test relies on the fact that the specified certificate has an ECDSA
+// signature algorithm
 func TestConfig_ParseCiphers_Valid(t *testing.T) {
 	require := require.New(t)
 
-	validCiphers := strings.Join([]string{
-		"TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305",
-		"TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305",
-		"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
-		"TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
-		"TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
-		"TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384",
-		"TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256",
-		"TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA",
-		"TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256",
-		"TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA",
-		"TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA",
-		"TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA",
-		"TLS_RSA_WITH_AES_128_GCM_SHA256",
-		"TLS_RSA_WITH_AES_256_GCM_SHA384",
-		"TLS_RSA_WITH_AES_128_CBC_SHA256",
-		"TLS_RSA_WITH_AES_128_CBC_SHA",
-		"TLS_RSA_WITH_AES_256_CBC_SHA",
-	}, ",")
+	tlsConfig := &config.TLSConfig{
+		CertFile:  foocert,
+		KeyFile:   fookey,
+		KeyLoader: &config.KeyLoader{},
+		TLSCipherSuites: strings.Join([]string{
+			"TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305",
+			"TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305",
+			"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+			"TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
+			"TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
+			"TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384",
+			"TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256",
+			"TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA",
+			"TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256",
+			"TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA",
+			"TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA",
+			"TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA",
+			"TLS_RSA_WITH_AES_128_GCM_SHA256",
+			"TLS_RSA_WITH_AES_256_GCM_SHA384",
+			"TLS_RSA_WITH_AES_128_CBC_SHA256",
+			"TLS_RSA_WITH_AES_128_CBC_SHA",
+			"TLS_RSA_WITH_AES_256_CBC_SHA",
+		}, ","),
+	}
 
 	expectedCiphers := []uint16{
 		tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
@@ -765,11 +772,13 @@ func TestConfig_ParseCiphers_Valid(t *testing.T) {
 		tls.TLS_RSA_WITH_AES_256_CBC_SHA,
 	}
 
-	parsedCiphers, err := ParseCiphers(validCiphers)
+	parsedCiphers, err := ParseCiphers(tlsConfig)
 	require.Nil(err)
 	require.Equal(parsedCiphers, expectedCiphers)
 }
 
+// This test relies on the fact that the specified certificate has an ECDSA
+// signature algorithm
 func TestConfig_ParseCiphers_Default(t *testing.T) {
 	require := require.New(t)
 
@@ -786,11 +795,18 @@ func TestConfig_ParseCiphers_Default(t *testing.T) {
 		tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
 	}
 
-	parsedCiphers, err := ParseCiphers("")
+	empty := &config.TLSConfig{
+		CertFile:  foocert,
+		KeyFile:   fookey,
+		KeyLoader: &config.KeyLoader{},
+	}
+	parsedCiphers, err := ParseCiphers(empty)
 	require.Nil(err)
 	require.Equal(parsedCiphers, expectedCiphers)
 }
 
+// This test relies on the fact that the specified certificate has an ECDSA
+// signature algorithm
 func TestConfig_ParseCiphers_Invalid(t *testing.T) {
 	require := require.New(t)
 
@@ -800,9 +816,47 @@ func TestConfig_ParseCiphers_Invalid(t *testing.T) {
 	}
 
 	for _, cipher := range invalidCiphers {
-		parsedCiphers, err := ParseCiphers(cipher)
+		tlsConfig := &config.TLSConfig{
+			TLSCipherSuites: cipher,
+			CertFile:        foocert,
+			KeyFile:         fookey,
+			KeyLoader:       &config.KeyLoader{},
+		}
+		parsedCiphers, err := ParseCiphers(tlsConfig)
 		require.NotNil(err)
 		require.Equal(fmt.Sprintf("unsupported TLS cipher %q", cipher), err.Error())
+		require.Equal(0, len(parsedCiphers))
+	}
+}
+
+// This test relies on the fact that the specified certificate has an ECDSA
+// signature algorithm
+func TestConfig_ParseCiphers_SupportedSignature(t *testing.T) {
+	require := require.New(t)
+
+	// Supported signature
+	{
+		tlsConfig := &config.TLSConfig{
+			TLSCipherSuites: "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305",
+			CertFile:        foocert,
+			KeyFile:         fookey,
+			KeyLoader:       &config.KeyLoader{},
+		}
+		parsedCiphers, err := ParseCiphers(tlsConfig)
+		require.Nil(err)
+		require.Equal(1, len(parsedCiphers))
+	}
+
+	// Unsupported signature
+	{
+		tlsConfig := &config.TLSConfig{
+			TLSCipherSuites: "TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305",
+			CertFile:        foocert,
+			KeyFile:         fookey,
+			KeyLoader:       &config.KeyLoader{},
+		}
+		parsedCiphers, err := ParseCiphers(tlsConfig)
+		require.NotNil(err)
 		require.Equal(0, len(parsedCiphers))
 	}
 }
@@ -847,7 +901,10 @@ func TestConfig_NewTLSConfiguration(t *testing.T) {
 	require := require.New(t)
 
 	conf := &config.TLSConfig{
-		TLSCipherSuites: "TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+		TLSCipherSuites: "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+		CertFile:        foocert,
+		KeyFile:         fookey,
+		KeyLoader:       &config.KeyLoader{},
 	}
 
 	tlsConf, err := NewTLSConfiguration(conf, true, true)
@@ -856,8 +913,94 @@ func TestConfig_NewTLSConfiguration(t *testing.T) {
 	require.True(tlsConf.VerifyOutgoing)
 
 	expectedCiphers := []uint16{
-		tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
+		tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
 		tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
 	}
 	require.Equal(tlsConf.CipherSuites, expectedCiphers)
+}
+
+func TestConfig_ShouldReloadRPCConnections(t *testing.T) {
+	require := require.New(t)
+
+	type shouldReloadTestInput struct {
+		old          *config.TLSConfig
+		new          *config.TLSConfig
+		shouldReload bool
+		errorStr     string
+	}
+
+	testInput := []*shouldReloadTestInput{
+		{
+			old: &config.TLSConfig{
+				CAFile:   cacert,
+				CertFile: badcert,
+				KeyFile:  badkey,
+			},
+			new: &config.TLSConfig{
+				CAFile:   cacert,
+				CertFile: badcert,
+				KeyFile:  badkey,
+			},
+			shouldReload: false,
+			errorStr:     "Same TLS Configuration should not reload",
+		},
+		{
+			old: &config.TLSConfig{
+				CAFile:   cacert,
+				CertFile: badcert,
+				KeyFile:  badkey,
+			},
+			new: &config.TLSConfig{
+				CAFile:   cacert,
+				CertFile: foocert,
+				KeyFile:  fookey,
+			},
+			shouldReload: true,
+			errorStr:     "Different TLS Configuration should reload",
+		},
+		{
+			old: &config.TLSConfig{
+				CAFile:    cacert,
+				CertFile:  badcert,
+				KeyFile:   badkey,
+				EnableRPC: true,
+			},
+			new: &config.TLSConfig{
+				CAFile:    cacert,
+				CertFile:  badcert,
+				KeyFile:   badkey,
+				EnableRPC: false,
+			},
+			shouldReload: true,
+			errorStr:     "Downgrading RPC connections should force reload",
+		},
+		{
+			old: nil,
+			new: &config.TLSConfig{
+				CAFile:    cacert,
+				CertFile:  badcert,
+				KeyFile:   badkey,
+				EnableRPC: true,
+			},
+			shouldReload: true,
+			errorStr:     "Upgrading RPC connections should force reload",
+		},
+		{
+			old: &config.TLSConfig{
+				CAFile:    cacert,
+				CertFile:  badcert,
+				KeyFile:   badkey,
+				EnableRPC: true,
+			},
+			new:          nil,
+			shouldReload: true,
+			errorStr:     "Downgrading RPC connections should force reload",
+		},
+	}
+
+	for _, testCase := range testInput {
+		shouldReload, err := ShouldReloadRPCConnections(testCase.old, testCase.new)
+		require.NoError(err)
+		require.Equal(shouldReload, testCase.shouldReload, testCase.errorStr)
+	}
 }

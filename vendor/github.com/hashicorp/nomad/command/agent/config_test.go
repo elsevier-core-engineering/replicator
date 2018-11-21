@@ -45,6 +45,7 @@ func TestConfig_Merge(t *testing.T) {
 		Datacenter:                "dc1",
 		NodeName:                  "node1",
 		DataDir:                   "/tmp/dir1",
+		PluginDir:                 "/tmp/pluginDir1",
 		LogLevel:                  "INFO",
 		EnableDebug:               false,
 		LeaveOnInt:                false,
@@ -91,12 +92,11 @@ func TestConfig_Merge(t *testing.T) {
 			MaxKillTimeout: "20s",
 			ClientMaxPort:  19996,
 			Reserved: &Resources{
-				CPU:                 10,
-				MemoryMB:            10,
-				DiskMB:              10,
-				IOPS:                10,
-				ReservedPorts:       "1,10-30,55",
-				ParsedReservedPorts: []int{1, 2, 4},
+				CPU:           10,
+				MemoryMB:      10,
+				DiskMB:        10,
+				IOPS:          10,
+				ReservedPorts: "1,10-30,55",
 			},
 		},
 		Server: &ServerConfig{
@@ -175,6 +175,15 @@ func TestConfig_Merge(t *testing.T) {
 			DisableUpgradeMigration: &falseValue,
 			EnableCustomUpgrades:    &falseValue,
 		},
+		Plugins: []*config.PluginConfig{
+			{
+				Name: "docker",
+				Args: []string{"foo"},
+				Config: map[string]interface{}{
+					"bar": 1,
+				},
+			},
+		},
 	}
 
 	c3 := &Config{
@@ -182,6 +191,7 @@ func TestConfig_Merge(t *testing.T) {
 		Datacenter:                "dc2",
 		NodeName:                  "node2",
 		DataDir:                   "/tmp/dir2",
+		PluginDir:                 "/tmp/pluginDir2",
 		LogLevel:                  "DEBUG",
 		EnableDebug:               true,
 		LeaveOnInt:                true,
@@ -237,12 +247,11 @@ func TestConfig_Merge(t *testing.T) {
 			MemoryMB:       105,
 			MaxKillTimeout: "50s",
 			Reserved: &Resources{
-				CPU:                 15,
-				MemoryMB:            15,
-				DiskMB:              15,
-				IOPS:                15,
-				ReservedPorts:       "2,10-30,55",
-				ParsedReservedPorts: []int{1, 2, 3},
+				CPU:           15,
+				MemoryMB:      15,
+				DiskMB:        15,
+				IOPS:          15,
+				ReservedPorts: "2,10-30,55",
 			},
 			GCInterval:            6 * time.Second,
 			GCParallelDestroys:    6,
@@ -340,6 +349,22 @@ func TestConfig_Merge(t *testing.T) {
 			EnableRedundancyZones:   &trueValue,
 			DisableUpgradeMigration: &trueValue,
 			EnableCustomUpgrades:    &trueValue,
+		},
+		Plugins: []*config.PluginConfig{
+			{
+				Name: "docker",
+				Args: []string{"bam"},
+				Config: map[string]interface{}{
+					"baz": 2,
+				},
+			},
+			{
+				Name: "exec",
+				Args: []string{"arg"},
+				Config: map[string]interface{}{
+					"config": true,
+				},
+			},
 		},
 	}
 
@@ -846,54 +871,6 @@ func TestConfig_normalizeAddrs(t *testing.T) {
 
 	if c.AdvertiseAddrs.RPC != "127.0.0.1:4647" {
 		t.Fatalf("expected RPC advertise address 127.0.0.1:4647, got %s", c.AdvertiseAddrs.RPC)
-	}
-}
-
-func TestResources_ParseReserved(t *testing.T) {
-	cases := []struct {
-		Input  string
-		Parsed []int
-		Err    bool
-	}{
-		{
-			"1,2,3",
-			[]int{1, 2, 3},
-			false,
-		},
-		{
-			"3,1,2,1,2,3,1-3",
-			[]int{1, 2, 3},
-			false,
-		},
-		{
-			"3-1",
-			nil,
-			true,
-		},
-		{
-			"1-3,2-4",
-			[]int{1, 2, 3, 4},
-			false,
-		},
-		{
-			"1-3,4,5-5,6,7,8-10",
-			[]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
-			false,
-		},
-	}
-
-	for i, tc := range cases {
-		r := &Resources{ReservedPorts: tc.Input}
-		err := r.ParseReserved()
-		if (err != nil) != tc.Err {
-			t.Fatalf("test case %d: %v", i, err)
-			continue
-		}
-
-		if !reflect.DeepEqual(r.ParsedReservedPorts, tc.Parsed) {
-			t.Fatalf("test case %d: \n\n%#v\n\n%#v", i, r.ParsedReservedPorts, tc.Parsed)
-		}
-
 	}
 }
 

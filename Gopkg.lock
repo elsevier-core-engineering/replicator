@@ -68,6 +68,12 @@
   revision = "bcd34c9993f899273c74baaa95e15386cd97b6e7"
 
 [[projects]]
+  name = "github.com/golang/protobuf"
+  packages = ["proto","ptypes/wrappers"]
+  revision = "aa810b61a9c79d51363740d207bb46cf8e620ed5"
+  version = "v1.2.0"
+
+[[projects]]
   name = "github.com/google/go-querystring"
   packages = ["query"]
   revision = "44c6ddd0a2342c386950e880b658017258da92fc"
@@ -158,10 +164,10 @@
   revision = "a14192a58a694c123d8fe5481d4a4727d6ae82f3"
 
 [[projects]]
+  branch = "master"
   name = "github.com/hashicorp/nomad"
-  packages = ["acl","api","api/contexts","helper","helper/args","helper/flatmap","helper/uuid","nomad/structs"]
-  revision = "fcc4149c55399eb4979cd3fe3fb983cfe6c8449a"
-  version = "v0.8.6"
+  packages = ["acl","api","api/contexts","helper","helper/args","helper/flatmap","helper/uuid","lib/kheap","nomad/structs","plugins/shared/structs","plugins/shared/structs/proto"]
+  revision = "2aa034e174f8616ba4cf82721fc5087267894604"
 
 [[projects]]
   name = "github.com/hashicorp/raft"
@@ -279,6 +285,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "c13bd953d75f53c271828fdb5066a13e68efd8278d6781731855c84157a8c943"
+  inputs-digest = "9f7ef153a82270d960ea51b5929ae09d9b25dbdc39c5f9c0a87c26cbacfcee1d"
   solver-name = "gps-cdcl"
   solver-version = 1

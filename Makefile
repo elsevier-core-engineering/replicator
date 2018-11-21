@@ -45,7 +45,7 @@ vet:
 
 deps:
 	@echo "==> Running $@..."
-	dep ensure
+	@dep ensure
 
 clean:
 	@echo "==> Running $@..."

@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/nomad/helper"
 	hargs "github.com/hashicorp/nomad/helper/args"
 	"github.com/hashicorp/nomad/nomad/structs"
+	"github.com/zclconf/go-cty/cty"
 )
 
 // A set of environment variables that are exported by each driver.
@@ -159,6 +160,70 @@ func (t *TaskEnv) All() map[string]string {
 	return m
 }
 
+// AllValues is a map of the task's environment variables and the node's
+// attributes with cty.Value (String) values. Errors including keys are
+// returned in a map by key name.
+//
+// In the rare case of a fatal error, only an error value is returned. This is
+// likely a programming error as user input should not be able to cause a fatal
+// error.
+func (t *TaskEnv) AllValues() (map[string]cty.Value, map[string]error, error) {
+	errs := make(map[string]error)
+
+	// Intermediate map for building up nested go types
+	allMap := make(map[string]interface{}, len(t.EnvMap)+len(t.NodeAttrs))
+
+	// Intermediate map for all env vars including those whose keys that
+	// cannot be nested (eg foo...bar)
+	envMap := make(map[string]cty.Value, len(t.EnvMap))
+
+	// Prepare job-based variables (eg job.meta, job.group.task.env, etc)
+	for k, v := range t.EnvMap {
+		if err := addNestedKey(allMap, k, v); err != nil {
+			errs[k] = err
+		}
+		envMap[k] = cty.StringVal(v)
+	}
+
+	// Prepare node-based variables (eg node.*, attr.*, meta.*)
+	for k, v := range t.NodeAttrs {
+		if err := addNestedKey(allMap, k, v); err != nil {
+			errs[k] = err
+		}
+	}
+
+	// Add flat envMap as a Map to allMap so users can access any key via
+	// HCL2's indexing syntax: ${env["foo...bar"]}
+	allMap["env"] = cty.MapVal(envMap)
+
+	// Add meta and attr to node if they exist to properly namespace things
+	// a bit.
+	nodeMapI, ok := allMap["node"]
+	if !ok {
+		return nil, nil, fmt.Errorf("missing node variable")
+	}
+	nodeMap, ok := nodeMapI.(map[string]interface{})
+	if !ok {
+		return nil, nil, fmt.Errorf("invalid type for node variable: %T", nodeMapI)
+	}
+	if attrMap, ok := allMap["attr"]; ok {
+		nodeMap["attr"] = attrMap
+	}
+	if metaMap, ok := allMap["meta"]; ok {
+		nodeMap["meta"] = metaMap
+	}
+
+	// ctyify the entire tree of strings and maps
+	tree, err := ctyify(allMap)
+	if err != nil {
+		// This should not be possible and is likely a programming
+		// error. Invalid user input should be cleaned earlier.
+		return nil, nil, err
+	}
+
+	return tree, errs, nil
+}
+
 // ParseAndReplace takes the user supplied args replaces any instance of an
 // environment variable or Nomad variable in the args with the actual value.
 func (t *TaskEnv) ParseAndReplace(args []string) []string {
@@ -207,8 +272,8 @@ type Builder struct {
 	// secretsDir from task's perspective; eg /secrets
 	secretsDir string
 
-	cpuLimit         int
-	memLimit         int
+	cpuLimit         int64
+	memLimit         int64
 	taskName         string
 	allocIndex       int
 	datacenter       string
@@ -247,7 +312,8 @@ func NewBuilder(node *structs.Node, alloc *structs.Allocation, task *structs.Tas
 // NewEmptyBuilder creates a new environment builder.
 func NewEmptyBuilder() *Builder {
 	return &Builder{
-		mu: &sync.RWMutex{},
+		mu:      &sync.RWMutex{},
+		envvars: make(map[string]string),
 	}
 }
 
@@ -272,10 +338,10 @@ func (b *Builder) Build() *TaskEnv {
 
 	// Add the resource limits
 	if b.memLimit != 0 {
-		envMap[MemLimit] = strconv.Itoa(b.memLimit)
+		envMap[MemLimit] = strconv.FormatInt(b.memLimit, 10)
 	}
 	if b.cpuLimit != 0 {
-		envMap[CpuLimit] = strconv.Itoa(b.cpuLimit)
+		envMap[CpuLimit] = strconv.FormatInt(b.cpuLimit, 10)
 	}
 
 	// Add the task metadata
@@ -362,6 +428,16 @@ func (b *Builder) UpdateTask(alloc *structs.Allocation, task *structs.Task) *Bui
 	return b.setTask(task).setAlloc(alloc)
 }
 
+func (b *Builder) SetGenericEnv(envs map[string]string) *Builder {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	for k, v := range envs {
+		b.envvars[k] = v
+	}
+
+	return b
+}
+
 // setTask is called from NewBuilder to populate task related environment
 // variables.
 func (b *Builder) setTask(task *structs.Task) *Builder {
@@ -370,13 +446,15 @@ func (b *Builder) setTask(task *structs.Task) *Builder {
 	for k, v := range task.Env {
 		b.envvars[k] = v
 	}
+
+	// COMPAT(0.11): Remove in 0.11
 	if task.Resources == nil {
 		b.memLimit = 0
 		b.cpuLimit = 0
 		b.networks = []*structs.NetworkResource{}
 	} else {
-		b.memLimit = task.Resources.MemoryMB
-		b.cpuLimit = task.Resources.CPU
+		b.memLimit = int64(task.Resources.MemoryMB)
+		b.cpuLimit = int64(task.Resources.CPU)
 		// Copy networks to prevent sharing
 		b.networks = make([]*structs.NetworkResource, len(task.Resources.Networks))
 		for i, n := range task.Resources.Networks {
@@ -419,18 +497,50 @@ func (b *Builder) setAlloc(alloc *structs.Allocation) *Builder {
 		b.taskMeta[fmt.Sprintf("%s%s", MetaPrefix, k)] = v
 	}
 
-	// Add ports from other tasks
-	b.otherPorts = make(map[string]string, len(alloc.TaskResources)*2)
-	for taskName, resources := range alloc.TaskResources {
-		if taskName == b.taskName {
-			continue
-		}
-		for _, nw := range resources.Networks {
-			for _, p := range nw.ReservedPorts {
-				addPort(b.otherPorts, taskName, nw.IP, p.Label, p.Value)
+	// COMPAT(0.11): Remove in 0.11
+	b.otherPorts = make(map[string]string, len(alloc.Job.LookupTaskGroup(alloc.TaskGroup).Tasks)*2)
+	if alloc.AllocatedResources != nil {
+		// Populate task resources
+		if tr, ok := alloc.AllocatedResources.Tasks[b.taskName]; ok {
+			b.cpuLimit = tr.Cpu.CpuShares
+			b.memLimit = tr.Memory.MemoryMB
+
+			// Copy networks to prevent sharing
+			b.networks = make([]*structs.NetworkResource, len(tr.Networks))
+			for i, n := range tr.Networks {
+				b.networks[i] = n.Copy()
 			}
-			for _, p := range nw.DynamicPorts {
-				addPort(b.otherPorts, taskName, nw.IP, p.Label, p.Value)
+		}
+
+		// Add ports from other tasks
+		for taskName, resources := range alloc.AllocatedResources.Tasks {
+			// Add ports from other tasks
+			if taskName == b.taskName {
+				continue
+			}
+
+			for _, nw := range resources.Networks {
+				for _, p := range nw.ReservedPorts {
+					addPort(b.otherPorts, taskName, nw.IP, p.Label, p.Value)
+				}
+				for _, p := range nw.DynamicPorts {
+					addPort(b.otherPorts, taskName, nw.IP, p.Label, p.Value)
+				}
+			}
+		}
+	} else if alloc.TaskResources != nil {
+		for taskName, resources := range alloc.TaskResources {
+			// Add ports from other tasks
+			if taskName == b.taskName {
+				continue
+			}
+			for _, nw := range resources.Networks {
+				for _, p := range nw.ReservedPorts {
+					addPort(b.otherPorts, taskName, nw.IP, p.Label, p.Value)
+				}
+				for _, p := range nw.DynamicPorts {
+					addPort(b.otherPorts, taskName, nw.IP, p.Label, p.Value)
+				}
 			}
 		}
 	}

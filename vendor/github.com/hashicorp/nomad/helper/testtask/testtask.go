@@ -12,12 +12,12 @@ import (
 	"time"
 
 	"github.com/hashicorp/nomad/nomad/structs"
-	"github.com/kardianos/osext"
+	"github.com/hashicorp/nomad/plugins/drivers"
 )
 
 // Path returns the path to the currently running executable.
 func Path() string {
-	path, err := osext.Executable()
+	path, err := os.Executable()
 	if err != nil {
 		panic(err)
 	}
@@ -33,6 +33,15 @@ func SetCmdEnv(cmd *exec.Cmd) {
 // SetTaskEnv configures the environment of t so that Run executes a testtask
 // script when called from within t.
 func SetTaskEnv(t *structs.Task) {
+	if t.Env == nil {
+		t.Env = map[string]string{}
+	}
+	t.Env["TEST_TASK"] = "execute"
+}
+
+// SetTaskConfigEnv configures the environment of t so that Run executes a testtask
+// script when called from within t.
+func SetTaskConfigEnv(t *drivers.TaskConfig) {
 	if t.Env == nil {
 		t.Env = map[string]string{}
 	}

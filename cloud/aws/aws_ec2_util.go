@@ -15,7 +15,7 @@ import (
 // translateIptoID translates the IP address of a node to the EC2 instance ID.
 func translateIptoID(ip, region string) (id string) {
 	sess := session.Must(session.NewSession())
-	svc := ec2.New(sess, &aws.Config{Region: aws.String(region)})
+	svc := ec2.New(sess, awsConfig(region))
 
 	params := &ec2.DescribeInstancesInput{
 		DryRun: aws.Bool(false),
@@ -43,7 +43,7 @@ func translateIptoID(ip, region string) (id string) {
 func terminateInstance(instanceID, region string) error {
 	// Setup the session and the EC2 service link to use for this operation.
 	sess := session.Must(session.NewSession())
-	svc := ec2.New(sess, &aws.Config{Region: aws.String(region)})
+	svc := ec2.New(sess, awsConfig(region))
 
 	// Setup parameters for the termination API request.
 	tparams := &ec2.TerminateInstancesInput{

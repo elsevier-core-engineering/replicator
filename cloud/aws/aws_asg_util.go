@@ -57,7 +57,7 @@ func getMostRecentInstance(asg, region string) (node string, err error) {
 
 	// Setup AWS EC2 API Session
 	sess := session.Must(session.NewSession())
-	svc := ec2.New(sess, &aws.Config{Region: aws.String(region)})
+	svc := ec2.New(sess, awsConfig(region))
 
 	// Setup query parameters to find instances that are associated with the
 	// specified autoscaling group and are in a running or pending state.

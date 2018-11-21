@@ -235,6 +235,12 @@ func Register(node *nomad.Node, workerPool *structs.WorkerPool,
 	nodeRegistry.Lock.Lock()
 	defer nodeRegistry.Lock.Unlock()
 
+	// Decline to register the node if drain mode is enabled.
+	if node.SchedulingEligibility == "ineligible" {
+		return fmt.Errorf("an attempt to register node %v failed because the "+
+			"node is in drain mode", node.ID)
+	}
+
 	// If the worker pool is already present in the registry, determine
 	// if the node is already registered, otherwise, register the node.
 	if existingPool, ok := nodeRegistry.WorkerPools[workerPool.Name]; ok {

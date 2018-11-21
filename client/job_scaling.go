@@ -188,14 +188,15 @@ func (c *nomadClient) IsJobInDeployment(jobName string) (isRunning bool) {
 	if resp == nil {
 		logging.Debug("client/job_scaling: no deployments found for job: %v", jobName)
 		return false
-	} else {
-		switch resp.Status {
-		case nomadstructs.DeploymentStatusRunning:
-			return true
-		case nomadstructs.DeploymentStatusDescriptionPaused:
-			return true
-		default:
-			return false
-		}
 	}
+
+	switch resp.Status {
+	case nomadstructs.DeploymentStatusRunning:
+		return true
+	case nomadstructs.DeploymentStatusDescriptionPaused:
+		return true
+	default:
+		return false
+	}
+
 }

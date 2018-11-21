@@ -41,12 +41,12 @@ type nomadClient struct {
 // NewNomadClient is used to create a new client to interact with Nomad. The
 // client implements the NomadClient interface.
 func NewNomadClient(addr string, token string,
-	tls_server_name string) (structs.NomadClient, error) {
+	tlsServerName string) (structs.NomadClient, error) {
 
 	config := nomad.DefaultConfig()
 	config.Address = addr
 	config.SecretID = token
-	config.TLSConfig.TLSServerName = tls_server_name
+	config.TLSConfig.TLSServerName = tlsServerName
 
 	c, err := nomad.NewClient(config)
 	if err != nil {
@@ -170,7 +170,10 @@ func (c *nomadClient) LeastAllocatedNode(capacity *structs.ClusterCapacity,
 // will be assigned and existing allocations will be migrated.
 func (c *nomadClient) DrainNode(nodeID string) (err error) {
 	// Initiate allocation draining for specified node.
-	drainSpec := &nomad.DrainSpec{}
+	drainSpec := &api.DrainSpec{
+		Deadline:         1 * time.Hour,
+		IgnoreSystemJobs: false,
+	}
 	_, err = c.nomad.Nodes().UpdateDrain(nodeID, drainSpec, true, &nomad.WriteOptions{})
 	if err != nil {
 		return err

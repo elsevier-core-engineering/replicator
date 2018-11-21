@@ -24,6 +24,9 @@ func describeScalingGroup(asgName string,
 		},
 	}
 	resp, err := svc.DescribeAutoScalingGroups(params)
+	if err != nil {
+		return nil, fmt.Errorf("DescribeAutoScalingGroups failed with %v", err)
+	}
 
 	// If we failed to get exactly one ASG, raise an error.
 	if len(resp.AutoScalingGroups) != 1 {

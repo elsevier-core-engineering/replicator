@@ -148,7 +148,7 @@ func TestNodeDiscovery_ProcessNodeConfig(t *testing.T) {
 		// a partial fallback configuration fails.
 		data := []byte(`{"replicator_enabled":"true",
                                 "replicator_worker_pool":"example-group"}`)
-		server.SetKV("replicator/config/nodes/example-group", data)
+		server.SetKV(t, "replicator/config/nodes/example-group", data)
 
 		_, err = ProcessNodeConfig(nodeRecord, config)
 		if err == nil {
@@ -163,7 +163,7 @@ func TestNodeDiscovery_ProcessNodeConfig(t *testing.T) {
                                "replicator_provider":"aws",
                                "replicator_region":"us-east-1",
                                "replicator_worker_pool":"example-group"}`)
-		server.SetKV("replicator/config/nodes/example-group", data)
+		server.SetKV(t, "replicator/config/nodes/example-group", data)
 
 		_, err = ProcessNodeConfig(nodeRecord, config)
 		if err != nil {

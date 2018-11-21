@@ -32,7 +32,7 @@ func describeScalingGroup(asgName string,
 	if len(resp.AutoScalingGroups) != 1 {
 		err = fmt.Errorf("the attempt to retrieve the current worker pool "+
 			"autoscaling group configuration expected exaclty one result got %v",
-			len(asg.AutoScalingGroups))
+			len(resp.AutoScalingGroups))
 	}
 
 	return resp, err

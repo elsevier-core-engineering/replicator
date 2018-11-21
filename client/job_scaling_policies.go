@@ -102,7 +102,7 @@ func (c *nomadClient) jobScalingPolicyProcessor(jobID string, scaling *structs.J
 	for _, group := range jobInfo.TaskGroups {
 
 		if group.Update == nil {
-			logging.Error("client/job_scaling_policies: job %s and group %v is missing update stanza",
+			logging.Debug("client/job_scaling_policies: job %s and group %v is missing update stanza",
 				jobID, *group.Name)
 			continue
 		}

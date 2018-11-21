@@ -12,25 +12,25 @@ import (
 	"github.com/d3sw/replicator/replicator/structs"
 )
 
-// AwsScalingProvider implements the ScalingProvider interface and provides
+// ScalingProvider implements the ScalingProvider interface and provides
 // a provider that is capable of performing scaling operations against
 // Nomad worker pools running on AWS autoscaling groups.
 //
 // The provider performs verification of each action it takes and provides
 // automatic retry for scale-out operations that fail.
-type AwsScalingProvider struct {
+type ScalingProvider struct {
 	AsgService *autoscaling.AutoScaling
 }
 
-// NewAwsScalingProvider is a factory function that generates a new instance
-// of the AwsScalingProvider.
-func NewAwsScalingProvider(workerPool *structs.WorkerPool) (structs.ScalingProvider, error) {
+// NewScalingProvider is a factory function that generates a new instance
+// of the ScalingProvider.
+func NewScalingProvider(workerPool *structs.WorkerPool) (structs.ScalingProvider, error) {
 	if workerPool.Region == "" {
 		return nil, fmt.Errorf("replicator_region is required for the aws " +
 			"scaling provider")
 	}
 
-	return &AwsScalingProvider{
+	return &ScalingProvider{
 		AsgService: newAwsAsgService(workerPool.Region),
 	}, nil
 }
@@ -44,7 +44,7 @@ func newAwsAsgService(region string) (Session *autoscaling.AutoScaling) {
 
 // Scale is the entry point method for performing scaling operations with
 // the provider.
-func (sp *AwsScalingProvider) Scale(workerPool *structs.WorkerPool,
+func (sp *ScalingProvider) Scale(workerPool *structs.WorkerPool,
 	config *structs.Config, nodeRegistry *structs.NodeRegistry) (err error) {
 
 	switch workerPool.State.ScalingDirection {
@@ -78,7 +78,7 @@ func (sp *AwsScalingProvider) Scale(workerPool *structs.WorkerPool,
 
 // scaleOut is the internal method used to initiate a scale out operation
 // against a worker pool autoscaling group.
-func (sp *AwsScalingProvider) scaleOut(workerPool *structs.WorkerPool) error {
+func (sp *ScalingProvider) scaleOut(workerPool *structs.WorkerPool) error {
 	// Get the current autoscaling group configuration.
 	asg, err := describeScalingGroup(workerPool.Name, sp.AsgService)
 	if err != nil {
@@ -122,7 +122,7 @@ func (sp *AwsScalingProvider) scaleOut(workerPool *structs.WorkerPool) error {
 
 // scaleIn is the internal method used to initiate a scale in operation
 // against a worker pool autoscaling group.
-func (sp *AwsScalingProvider) scaleIn(workerPool *structs.WorkerPool, config *structs.Config) error {
+func (sp *ScalingProvider) scaleIn(workerPool *structs.WorkerPool, config *structs.Config) error {
 	// If no nodes have been registered as eligible for targeted scaling
 	// operations, throw an error and exit.
 	if len(workerPool.State.EligibleNodes) == 0 {
@@ -194,7 +194,7 @@ func (sp *AwsScalingProvider) scaleIn(workerPool *structs.WorkerPool, config *st
 }
 
 // Remove pulls a node out of the worker ASG and terminates it
-func (sp *AwsScalingProvider) Remove(workerPool *structs.WorkerPool, nodeAddr string) error {
+func (sp *ScalingProvider) Remove(workerPool *structs.WorkerPool, nodeAddr string) error {
 	// Translate the node IP address to the EC2 instance ID.
 	instanceID, err := translateIptoID(nodeAddr, workerPool.Region)
 	if err != nil {
@@ -239,7 +239,7 @@ func (sp *AwsScalingProvider) Remove(workerPool *structs.WorkerPool, nodeAddr st
 	return nil
 }
 
-func (sp *AwsScalingProvider) verifyScaledNode(workerPool *structs.WorkerPool,
+func (sp *ScalingProvider) verifyScaledNode(workerPool *structs.WorkerPool,
 	config *structs.Config, nodeRegistry *structs.NodeRegistry) (ok bool) {
 
 	// Setup reference to Consul client.
@@ -310,7 +310,7 @@ func (sp *AwsScalingProvider) verifyScaledNode(workerPool *structs.WorkerPool,
 // after a failed scaling event is detected. The node is detached and
 // terminated unless the retry threshold has been reached, in that case the
 // node is left in a detached state for troubleshooting.
-func (sp *AwsScalingProvider) failedEventCleanup(workerNode string,
+func (sp *ScalingProvider) failedEventCleanup(workerNode string,
 	workerPool *structs.WorkerPool) (err error) {
 
 	// Translate the IP address of the most recently launched node to
@@ -349,7 +349,7 @@ func (sp *AwsScalingProvider) failedEventCleanup(workerNode string,
 // SafetyCheck is an exported method that provides provider specific safety
 // checks that will be used by core runner to determine if a scaling operation
 // can be safely initiated.
-func (sp *AwsScalingProvider) SafetyCheck(workerPool *structs.WorkerPool) bool {
+func (sp *ScalingProvider) SafetyCheck(workerPool *structs.WorkerPool) bool {
 	// Retrieve ASG configuration so we can check min/max/desired counts
 	// against the desired scaling action.
 	asg, err := describeScalingGroup(workerPool.Name, sp.AsgService)

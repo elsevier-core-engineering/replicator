@@ -3,25 +3,26 @@ package client
 import (
 	"errors"
 
-	"github.com/opsgenie/opsgenie-go-sdk/user"
 	"github.com/opsgenie/opsgenie-go-sdk/logging"
+	"github.com/opsgenie/opsgenie-go-sdk/user"
 )
 
 const (
-	userURL          = "/v1/json/user"
+	userURL = "/v1/json/user"
 )
 
 // OpsGenieUserClient is the data type to make User API requests.
+// Deprecated: Please use OpsGenieUserV2Client
 type OpsGenieUserClient struct {
 	OpsGenieClient
 }
 
-// SetOpsGenieClient sets the embedded OpsGenieClient type of the OpsGenieUserClient.
+// Deprecated: SetOpsGenieClient sets the embedded OpsGenieClient type of the OpsGenieUserClient.
 func (cli *OpsGenieUserClient) SetOpsGenieClient(ogCli OpsGenieClient) {
 	cli.OpsGenieClient = ogCli
 }
 
-// Create method creates a user at OpsGenie.
+// Deprecated: Create method creates a user at OpsGenie.
 func (cli *OpsGenieUserClient) Create(req user.CreateUserRequest) (*user.CreateUserResponse, error) {
 	req.APIKey = cli.apiKey
 	resp, err := cli.sendRequest(cli.buildPostRequest(userURL, req))
@@ -41,7 +42,7 @@ func (cli *OpsGenieUserClient) Create(req user.CreateUserRequest) (*user.CreateU
 	return &createUserResp, nil
 }
 
-// Update method updates a user at OpsGenie.
+// Deprecated: Update method updates a user at OpsGenie.
 func (cli *OpsGenieUserClient) Update(req user.UpdateUserRequest) (*user.UpdateUserResponse, error) {
 	req.APIKey = cli.apiKey
 	resp, err := cli.sendRequest(cli.buildPostRequest(userURL, req))
@@ -61,7 +62,7 @@ func (cli *OpsGenieUserClient) Update(req user.UpdateUserRequest) (*user.UpdateU
 	return &updateUserResp, nil
 }
 
-// Delete method deletes a user at OpsGenie.
+// Deprecated: Delete method deletes a user at OpsGenie.
 func (cli *OpsGenieUserClient) Delete(req user.DeleteUserRequest) (*user.DeleteUserResponse, error) {
 	req.APIKey = cli.apiKey
 	resp, err := cli.sendRequest(cli.buildDeleteRequest(userURL, req))
@@ -81,7 +82,7 @@ func (cli *OpsGenieUserClient) Delete(req user.DeleteUserRequest) (*user.DeleteU
 	return &deleteUserResp, nil
 }
 
-// Get method retrieves specified user details from OpsGenie.
+// Deprecated: Get method retrieves specified user details from OpsGenie.
 func (cli *OpsGenieUserClient) Get(req user.GetUserRequest) (*user.GetUserResponse, error) {
 	req.APIKey = cli.apiKey
 	resp, err := cli.sendRequest(cli.buildGetRequest(userURL, req))
@@ -101,7 +102,7 @@ func (cli *OpsGenieUserClient) Get(req user.GetUserRequest) (*user.GetUserRespon
 	return &getUserResp, nil
 }
 
-// List method retrieves users from OpsGenie.
+// Deprecated: List method retrieves users from OpsGenie.
 func (cli *OpsGenieUserClient) List(req user.ListUsersRequest) (*user.ListUsersResponse, error) {
 	req.APIKey = cli.apiKey
 	resp, err := cli.sendRequest(cli.buildGetRequest(userURL, req))

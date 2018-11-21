@@ -33,20 +33,20 @@ license that can be found in the LICENSE file.
 package client
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"mime/multipart"
+	"os"
 	"runtime"
 	"time"
-	"os"
-	"mime/multipart"
-	"bytes"
-	"io"
 
 	"github.com/franela/goreq"
 	goquery "github.com/google/go-querystring/query"
-	"github.com/opsgenie/opsgenie-go-sdk/logging"
 	"github.com/opsgenie/opsgenie-go-sdk/alertsv2"
+	"github.com/opsgenie/opsgenie-go-sdk/logging"
 	"path/filepath"
 )
 
@@ -287,6 +287,7 @@ func (cli *OpsGenieClient) ScheduleOverride() (*OpsGenieScheduleOverrideClient, 
 }
 
 // User instantiates a new OpsGenieUserClient.
+// Deprecated: Please use UserV2() method
 func (cli *OpsGenieClient) User() (*OpsGenieUserClient, error) {
 	cli.makeHTTPTransportSettings()
 
@@ -298,6 +299,89 @@ func (cli *OpsGenieClient) User() (*OpsGenieUserClient, error) {
 	}
 
 	return userClient, nil
+}
+
+// UserV2 instantiates a new OpsGenieUserV2Client.
+func (cli *OpsGenieClient) UserV2() (*OpsGenieUserV2Client, error) {
+	cli.makeHTTPTransportSettings()
+
+	userClient := new(OpsGenieUserV2Client)
+	userClient.SetOpsGenieClient(*cli)
+
+	if cli.opsGenieAPIURL == "" {
+		userClient.SetOpsGenieAPIUrl(endpointURL)
+	}
+
+	return userClient, nil
+}
+
+// NotificationV2 instantiates a new OpsGenieNotificationV2Client
+func (cli *OpsGenieClient) NotificationV2() (*OpsGenieNotificationV2Client, error) {
+	cli.makeHTTPTransportSettings()
+
+	notificationClient := new(OpsGenieNotificationV2Client)
+	notificationClient.SetOpsGenieClient(*cli)
+
+	if cli.opsGenieAPIURL == "" {
+		notificationClient.SetOpsGenieAPIUrl(endpointURL)
+	}
+
+	return notificationClient, nil
+}
+
+// ScheduleV2 instantiates a new OpsGenieScheduleV2Client
+func (cli *OpsGenieClient) ScheduleV2() (*OpsGenieScheduleV2Client, error) {
+	cli.makeHTTPTransportSettings()
+
+	scheduleClient := new(OpsGenieScheduleV2Client)
+	scheduleClient.SetOpsGenieClient(*cli)
+
+	if cli.opsGenieAPIURL == "" {
+		scheduleClient.SetOpsGenieAPIUrl(endpointURL)
+	}
+
+	return scheduleClient, nil
+}
+
+// ScheduleOverrideV2 instantiates a new OpsGenieScheduleOverrideV2Client
+func (cli *OpsGenieClient) ScheduleOverrideV2() (*OpsGenieScheduleOverrideV2Client, error) {
+	cli.makeHTTPTransportSettings()
+
+	scheduleOverrideClient := new(OpsGenieScheduleOverrideV2Client)
+	scheduleOverrideClient.SetOpsGenieClient(*cli)
+
+	if cli.opsGenieAPIURL == "" {
+		scheduleOverrideClient.SetOpsGenieAPIUrl(endpointURL)
+	}
+
+	return scheduleOverrideClient, nil
+}
+
+// ScheduleRotationV2 instantiates a new OpsGenieScheduleRotationV2Client
+func (cli *OpsGenieClient) ScheduleRotationV2() (*OpsGenieScheduleRotationV2Client, error) {
+	cli.makeHTTPTransportSettings()
+
+	scheduleRotationClient := new(OpsGenieScheduleRotationV2Client)
+	scheduleRotationClient.SetOpsGenieClient(*cli)
+
+	if cli.opsGenieAPIURL == "" {
+		scheduleRotationClient.SetOpsGenieAPIUrl(endpointURL)
+	}
+
+	return scheduleRotationClient, nil
+}
+
+func (cli *OpsGenieClient) Log() (*OpsGenieLogClient, error) {
+	cli.makeHTTPTransportSettings()
+
+	logClient := new(OpsGenieLogClient)
+	logClient.SetOpsGenieClient(*cli)
+
+	if cli.opsGenieAPIURL == "" {
+		logClient.SetOpsGenieAPIUrl(endpointURL)
+	}
+
+	return logClient, nil
 }
 
 // buildCommonRequestProps is an internal method to set common properties of requests that will send to OpsGenie.
@@ -450,6 +534,13 @@ func (cli *OpsGenieClient) buildPatchRequest(uri string, request interface{}) go
 func (cli *OpsGenieClient) buildDeleteRequest(uri string, request interface{}) goreq.Request {
 	req := cli.buildGetRequest(uri, request)
 	req.Method = "DELETE"
+	return req
+}
+
+// buildPutRequest is an internal method to prepare a "DELETE" request that will send to OpsGenie.
+func (cli *OpsGenieClient) buildPutRequest(uri string, request interface{}) goreq.Request {
+	req := cli.buildPostRequest(uri, request)
+	req.Method = "PUT"
 	return req
 }
 

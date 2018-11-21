@@ -99,7 +99,6 @@ func (cli *OpsGenieScheduleClient) Get(req schedule.GetScheduleRequest) (*schedu
 		logging.Logger().Warn(message)
 		return nil, errors.New(message)
 	}
-	fmt.Printf("%+v", getScheduleResp)
 	return &getScheduleResp, nil
 }
 
@@ -142,14 +141,13 @@ func (cli *OpsGenieScheduleClient) GetTimeline(req schedule.GetTimelineScheduleR
 		logging.Logger().Warn(message)
 		return nil, errors.New(message)
 	}
-	// fmt.Printf("%+v", timelineSchedulesResp)
 	return &timelineSchedulesResp, nil
 }
 
 // WhoIsOnCall method retrieves current oncall participants of a specific schedule from OpsGenie
 func (cli *OpsGenieScheduleClient) WhoIsOnCall(req schedule.WhoIsOnCallRequest) (*schedule.WhoIsOnCallResponse, error) {
 	req.APIKey = cli.apiKey
-	resp, err := cli.sendRequest(cli.buildGetRequest(scheduleURL + "/whoIsOnCall" , req))
+	resp, err := cli.sendRequest(cli.buildGetRequest(scheduleURL+"/whoIsOnCall", req))
 	if resp == nil {
 		return nil, err
 	}

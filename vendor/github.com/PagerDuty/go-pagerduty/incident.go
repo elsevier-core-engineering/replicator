@@ -36,7 +36,7 @@ type Incident struct {
 	Acknowledgements     []Acknowledgement `json:"acknowledgements,omitempty"`
 	LastStatusChangeAt   string            `json:"last_status_change_at,omitempty"`
 	LastStatusChangeBy   APIObject         `json:"last_status_change_by,omitempty"`
-	FirstTriggerLogEntry APIObject         `json:"last_trigger_log_entry,omitempty"`
+	FirstTriggerLogEntry APIObject         `json:"first_trigger_log_entry,omitempty"`
 	EscalationPolicy     APIObject         `json:"escalation_policy,omitempty"`
 	Teams                []APIObject       `json:"teams,omitempty"`
 	Urgency              string            `json:"urgency,omitempty"`
@@ -148,13 +148,13 @@ func (c *Client) SnoozeIncident(id string, duration uint) error {
 	return err
 }
 
-// ListIncidentLogEntriesResponse is the response structure when calling the ListIncidentLogEntires API endpoint.
+// ListIncidentLogEntriesResponse is the response structure when calling the ListIncidentLogEntries API endpoint.
 type ListIncidentLogEntriesResponse struct {
 	APIListObject
-	LogEntires []LogEntry `json:"log_entries,omitempty"`
+	LogEntries []LogEntry `json:"log_entries,omitempty"`
 }
 
-// ListIncidentLogEntriesOptions is the structure used when passing parameters to the ListIncidentLogEntires API endpoint.
+// ListIncidentLogEntriesOptions is the structure used when passing parameters to the ListIncidentLogEntries API endpoint.
 type ListIncidentLogEntriesOptions struct {
 	APIListObject
 	Includes   []string `url:"include,omitempty,brackets"`
@@ -162,7 +162,7 @@ type ListIncidentLogEntriesOptions struct {
 	TimeZone   string   `url:"time_zone,omitempty"`
 }
 
-// ListIncidentLogEntries lists existing log entires for the specified incident.
+// ListIncidentLogEntries lists existing log entries for the specified incident.
 func (c *Client) ListIncidentLogEntries(id string, o ListIncidentLogEntriesOptions) (*ListIncidentLogEntriesResponse, error) {
 	v, err := query.Values(o)
 	if err != nil {

@@ -98,7 +98,6 @@ func (cli *OpsGenieScheduleOverrideClient) Get(req override.GetScheduleOverrideR
 		logging.Logger().Warn(message)
 		return nil, errors.New(message)
 	}
-	fmt.Printf("%+v", getScheduleOverrideResp)
 	return &getScheduleOverrideResp, nil
 }
 

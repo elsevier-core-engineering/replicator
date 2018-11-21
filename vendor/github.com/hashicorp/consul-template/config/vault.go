@@ -8,6 +8,11 @@ import (
 )
 
 const (
+	// DefaultVaultGrace is the default grace period before which to read a new
+	// secret from Vault. If a lease is due to expire in 15 seconds, Consul
+	// Template will read a new secret at that time minus this value.
+	DefaultVaultGrace = 15 * time.Second
+
 	// DefaultVaultRenewToken is the default value for if the Vault token should
 	// be renewed.
 	DefaultVaultRenewToken = true
@@ -32,6 +37,10 @@ type VaultConfig struct {
 
 	// Enabled controls whether the Vault integration is active.
 	Enabled *bool `mapstructure:"enabled"`
+
+	// Grace is the amount of time before a lease is about to expire to force a
+	// new secret to be read.
+	Grace *time.Duration `mapstructure:"grace"`
 
 	// RenewToken renews the Vault token.
 	RenewToken *bool `mapstructure:"renew_token"`
@@ -80,6 +89,8 @@ func (c *VaultConfig) Copy() *VaultConfig {
 
 	o.Enabled = c.Enabled
 
+	o.Grace = c.Grace
+
 	o.RenewToken = c.RenewToken
 
 	if c.Retry != nil {
@@ -127,6 +138,10 @@ func (c *VaultConfig) Merge(o *VaultConfig) *VaultConfig {
 		r.Enabled = o.Enabled
 	}
 
+	if o.Grace != nil {
+		r.Grace = o.Grace
+	}
+
 	if o.RenewToken != nil {
 		r.RenewToken = o.RenewToken
 	}
@@ -162,6 +177,10 @@ func (c *VaultConfig) Finalize() {
 		}, "")
 	}
 
+	if c.Grace == nil {
+		c.Grace = TimeDuration(DefaultVaultGrace)
+	}
+
 	if c.RenewToken == nil {
 		c.RenewToken = boolFromEnv([]string{
 			"VAULT_RENEW_TOKEN",
@@ -173,14 +192,29 @@ func (c *VaultConfig) Finalize() {
 	}
 	c.Retry.Finalize()
 
+	// Vault has custom SSL settings
 	if c.SSL == nil {
 		c.SSL = DefaultSSLConfig()
+	}
+	if c.SSL.Enabled == nil {
 		c.SSL.Enabled = Bool(true)
+	}
+	if c.SSL.CaCert == nil {
 		c.SSL.CaCert = stringFromEnv([]string{api.EnvVaultCACert}, "")
+	}
+	if c.SSL.CaPath == nil {
 		c.SSL.CaPath = stringFromEnv([]string{api.EnvVaultCAPath}, "")
+	}
+	if c.SSL.Cert == nil {
 		c.SSL.Cert = stringFromEnv([]string{api.EnvVaultClientCert}, "")
+	}
+	if c.SSL.Key == nil {
 		c.SSL.Key = stringFromEnv([]string{api.EnvVaultClientKey}, "")
+	}
+	if c.SSL.ServerName == nil {
 		c.SSL.ServerName = stringFromEnv([]string{api.EnvVaultTLSServerName}, "")
+	}
+	if c.SSL.Verify == nil {
 		c.SSL.Verify = antiboolFromEnv([]string{api.EnvVaultInsecure}, true)
 	}
 	c.SSL.Finalize()
@@ -224,6 +258,7 @@ func (c *VaultConfig) GoString() string {
 	return fmt.Sprintf("&VaultConfig{"+
 		"Address:%s, "+
 		"Enabled:%s, "+
+		"Grace:%s, "+
 		"RenewToken:%s, "+
 		"Retry:%#v, "+
 		"SSL:%#v, "+
@@ -232,6 +267,7 @@ func (c *VaultConfig) GoString() string {
 		"UnwrapToken:%s"+
 		"}",
 		StringGoString(c.Address),
+		TimeDurationGoString(c.Grace),
 		BoolGoString(c.Enabled),
 		BoolGoString(c.RenewToken),
 		c.Retry,

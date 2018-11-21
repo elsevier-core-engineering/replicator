@@ -26,7 +26,7 @@ lint:
 	@echo "==> Running $@..."
 	@golint ./... | grep -v vendor | tee /dev/stderr
 
-test: fmt lint vet
+test: fmt lint vet deps
 	@echo "==> Running $@..."
 	@go test -v -tags "$(BUILDTAGS) cgo" $(shell go list ./... | grep -v vendor)
 
@@ -42,6 +42,10 @@ vet:
 	echo "Vet found suspicious constructs. Please check the reported constructs"; \
 	echo "and fix them if necessary before submitting the code for reviewal."; \
 	fi
+
+deps:
+	@echo "==> Running $@..."
+	dep ensure
 
 clean:
 	@echo "==> Running $@..."

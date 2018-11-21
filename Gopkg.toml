@@ -1,0 +1,94 @@
+
+# Gopkg.toml example
+#
+# Refer to https://github.com/golang/dep/blob/master/docs/Gopkg.toml.md
+# for detailed Gopkg.toml documentation.
+#
+# required = ["github.com/user/thing/cmd/thing"]
+# ignored = ["github.com/user/project/pkgX", "bitbucket.org/user/project/pkgA/pkgY"]
+#
+# [[constraint]]
+#   name = "github.com/user/project"
+#   version = "1.0.0"
+#
+# [[constraint]]
+#   name = "github.com/user/project2"
+#   branch = "dev"
+#   source = "github.com/myfork/project2"
+#
+# [[override]]
+#  name = "github.com/x/y"
+#  version = "2.4.0"
+
+
+[[constraint]]
+  name = "github.com/NYTimes/gziphandler"
+  version = "1.0.1"
+
+[[constraint]]
+  name = "github.com/PagerDuty/go-pagerduty"
+  version = "1.0.4"
+
+[[constraint]]
+  name = "github.com/Sirupsen/logrus"
+  version = "1.2.0"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/armon/go-metrics"
+
+[[constraint]]
+  name = "github.com/aws/aws-sdk-go"
+  version = "1.15.80"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/dariubs/percent"
+
+[[constraint]]
+  name = "github.com/hashicorp/consul"
+  version = "1.4.0"
+
+[[constraint]]
+  name = "github.com/hashicorp/consul-template"
+  version = "0.19.5"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/hashicorp/go-msgpack"
+
+[[constraint]]
+  name = "github.com/hashicorp/go-multierror"
+  version = "1.0.0"
+
+[[constraint]]
+  name = "github.com/hashicorp/hcl"
+  version = "1.0.0"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/hashicorp/net-rpc-msgpackrpc"
+
+[[constraint]]
+  name = "github.com/hashicorp/nomad"
+  version = "0.8.6"
+
+[[constraint]]
+  name = "github.com/mitchellh/cli"
+  version = "1.0.0"
+
+[[constraint]]
+  name = "github.com/mitchellh/hashstructure"
+  version = "1.0.0"
+
+[[constraint]]
+  name = "github.com/mitchellh/mapstructure"
+  version = "1.1.2"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/opsgenie/opsgenie-go-sdk"
+
+[[constraint]]
+  name = "github.com/ugorji/go"
+  version = "1.1.1"

@@ -71,6 +71,28 @@ func (cli *RestClient) sendPatchRequest(req Request, response Response) error {
 	return nil
 }
 
+func (cli *RestClient) sendPutRequest(req Request, response Response) error {
+	path, params, err := req.GenerateUrl()
+	if err != nil {
+		return err
+	}
+
+	request := cli.buildPutRequest(cli.generateFullPathWithParams(path, params), req)
+	cli.setApiKey(&request, req.GetApiKey())
+	httpResponse, err := cli.sendRequest(request)
+	if err != nil {
+		return err
+	}
+	defer httpResponse.Body.Close()
+
+	err = cli.writeBody(httpResponse, &response)
+	if err != nil {
+		return err
+	}
+	cli.setResponseMeta(httpResponse, response)
+	return nil
+}
+
 func (cli *RestClient) sendAsyncPostRequest(req Request) (*AsyncRequestResponse, error) {
 	var response AsyncRequestResponse
 	err := cli.sendPostRequest(req, &response)

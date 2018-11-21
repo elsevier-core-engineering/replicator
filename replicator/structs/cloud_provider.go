@@ -12,4 +12,8 @@ type ScalingProvider interface {
 	// provider internal methods for scale-out and scale-in operations,
 	// verification and rety (where applicable).
 	Scale(*WorkerPool, *Config, *NodeRegistry) error
+
+	// Force removes a node from the ScalingProvider's worker pool
+	// Takes a workerpool and a nomad node ip address
+	Remove(*WorkerPool, string) error
 }

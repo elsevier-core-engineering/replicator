@@ -70,7 +70,7 @@ func TestNodeDiscovery_ProcessNodeConfig(t *testing.T) {
 	t.Parallel()
 
 	// Get a list of nodes, all in a ready state with drain mode disabled.
-	nodes := mockNodes(false, true, structs.NodeStatusReady)
+	nodes := mockNodes("eligible", true, structs.NodeStatusReady)
 
 	// Build a fake config record.
 	// config := &structs.Config{}
@@ -200,14 +200,14 @@ func TestNodeDiscovery_Deregister(t *testing.T) {
 
 	// Confirm an error is thrown when attempting to deregister a node
 	// that was not prevously registered.
-	if err := Deregister("bad-node-id", nodeRegistry); err == nil {
+	if err := Deregister(&api.NodeListStub{ID: "bad-node-id"}, nodeRegistry); err == nil {
 		t.Fatalf("no exception was raised when attempting to deregister " +
 			"a node that was not previously registered")
 	}
 
 	// Simulate a worker pool with multuple nodes, all in a ready state
 	// and not in drain mode.
-	nodes := mockNodes(false, false, structs.NodeStatusReady)
+	nodes := mockNodes("eligible", false, structs.NodeStatusReady)
 
 	// Build a fake config record.
 	config := &structs.Config{}
@@ -240,13 +240,15 @@ func TestNodeDiscovery_Deregister(t *testing.T) {
 		ScalingEnabled:   true,
 		ScalingThreshold: 3,
 		Name:             "example-group",
+		ScaleFactor:      1,
 		Nodes: map[string]*api.Node{
 			"ec2026ec-3632-7cb6-a3d2-88b9e254c793": {
 				ID:         "ec2026ec-3632-7cb6-a3d2-88b9e254c793",
 				Datacenter: "dc1",
 				Name:       "example-node-one",
-				Drain:      false,
-				Status:     structs.NodeStatusReady,
+				SchedulingEligibility: "eligible",
+				Status:                structs.NodeStatusReady,
+				HTTPAddr:              "127.0.0.1",
 				Meta: map[string]string{
 					"replicator_enabled":          "true",
 					"replicator_max":              "3",
@@ -261,9 +263,9 @@ func TestNodeDiscovery_Deregister(t *testing.T) {
 	}
 
 	// Attempt to deregister the second node.
-	if err := Deregister(nodes[1].ID, nodeRegistry); err != nil {
-		t.Fatalf("an unexpected error occurred while attempting to deregister a " +
-			"node from an existing worker pool")
+	if err := Deregister(nodes[1], nodeRegistry); err == nil {
+		t.Fatalf("failed to handle deregistering node with " +
+			"serviceProvider failures")
 	}
 
 	// Copy the pointer reference to our scaling provider.
@@ -281,9 +283,9 @@ func TestNodeDiscovery_Deregister(t *testing.T) {
 	}
 
 	// Deregister last node and confirm worker pool is also deregistered.
-	if err := Deregister(nodes[0].ID, nodeRegistry); err != nil {
-		t.Fatalf("an unexpected error occurred while attempting to deregister a " +
-			"node from an existing worker pool")
+	if err := Deregister(nodes[0], nodeRegistry); err == nil {
+		t.Fatalf("failed to handle deregistering node from existing " +
+			"worker pool with serviceProvider failures")
 	}
 
 	// Reset expected node registry and verify our state matches after
@@ -317,13 +319,15 @@ func TestNodeDiscovery_RegisterNode(t *testing.T) {
 		ScalingEnabled:   true,
 		ScalingThreshold: 3,
 		Name:             "example-group",
+		ScaleFactor:      1,
 		Nodes: map[string]*api.Node{
 			"ec2026ec-3632-7cb6-a3d2-88b9e254c793": {
 				ID:         "ec2026ec-3632-7cb6-a3d2-88b9e254c793",
 				Datacenter: "dc1",
 				Name:       "example-node-one",
-				Drain:      false,
-				Status:     structs.NodeStatusReady,
+				SchedulingEligibility: "eligible",
+				Status:                structs.NodeStatusReady,
+				HTTPAddr:              "127.0.0.1",
 				Meta: map[string]string{
 					"replicator_enabled":          "true",
 					"replicator_max":              "3",
@@ -339,7 +343,7 @@ func TestNodeDiscovery_RegisterNode(t *testing.T) {
 
 	// Simulate a worker pool with multuple nodes, all in a ready state
 	// and not in drain mode.
-	nodes := mockNodes(false, false, structs.NodeStatusReady)
+	nodes := mockNodes("eligible", false, structs.NodeStatusReady)
 
 	// Retrieve detailed node configuration for first node.
 	nodeRecord := mockNode(nodes[0])
@@ -383,8 +387,9 @@ func TestNodeDiscovery_RegisterNode(t *testing.T) {
 		ID:         "ec282e52-4fb6-5950-ef5b-257fced6313c",
 		Datacenter: "dc1",
 		Name:       "example-node-two",
-		Drain:      false,
-		Status:     structs.NodeStatusReady,
+		SchedulingEligibility: "eligible",
+		Status:                structs.NodeStatusReady,
+		HTTPAddr:              "127.0.0.1",
 		Meta: map[string]string{
 			"replicator_enabled":          "true",
 			"replicator_max":              "3",
@@ -446,7 +451,7 @@ func TestNodeDiscovery_RegisterNode(t *testing.T) {
 	// we attempt to register a node in drain mode.
 	nodeRegistry = newNodeRegistry()
 	nodeRecord.Status = structs.NodeStatusReady
-	nodeRecord.Drain = true
+	nodeRecord.SchedulingEligibility = "ineligible"
 	if err = Register(nodeRecord, nodeConfig, nodeRegistry); err == nil {
 		t.Fatalf("no exception was raised when we attempted to register " +
 			"a node with drain mode enabled")
@@ -455,7 +460,7 @@ func TestNodeDiscovery_RegisterNode(t *testing.T) {
 	// Reset node registry object and confirm an exception is raised when
 	// we attempt to register a node with an invalid scaling provider.
 	nodeRegistry = newNodeRegistry()
-	nodes = mockNodes(false, false, structs.NodeStatusReady)
+	nodes = mockNodes("eligible", false, structs.NodeStatusReady)
 	nodeRecord = mockNode(nodes[0])
 	nodeRecord.Meta["replicator_provider"] = "foo"
 	nodeConfig, err = ProcessNodeConfig(nodeRecord, config)
@@ -478,15 +483,16 @@ func newNodeRegistry() *structs.NodeRegistry {
 	}
 }
 
-func mockNodes(drain bool, singleton bool, status string) (nodes []*api.NodeListStub) {
+func mockNodes(eligibility string, singleton bool, status string) (nodes []*api.NodeListStub) {
 	// Build a node stub record that permits the caller to toggle
 	// the status and drain mode.
 	nodes = append(nodes, &api.NodeListStub{
 		ID:         "ec2026ec-3632-7cb6-a3d2-88b9e254c793",
 		Datacenter: "dc1",
 		Name:       "example-node-one",
-		Drain:      drain,
-		Status:     status,
+		SchedulingEligibility: eligibility,
+		Status:                status,
+		Address:               "127.0.0.1",
 	})
 
 	if singleton == false {
@@ -495,8 +501,9 @@ func mockNodes(drain bool, singleton bool, status string) (nodes []*api.NodeList
 			ID:         "ec282e52-4fb6-5950-ef5b-257fced6313c",
 			Datacenter: "dc1",
 			Name:       "example-node-two",
-			Drain:      false,
-			Status:     structs.NodeStatusReady,
+			SchedulingEligibility: "eligible",
+			Status:                structs.NodeStatusReady,
+			Address:               "127.0.0.1",
 		})
 	}
 
@@ -509,9 +516,10 @@ func mockNode(node *api.NodeListStub) (nodeRecord *api.Node) {
 		ID:         node.ID,
 		Datacenter: node.Datacenter,
 		Name:       node.Name,
-		Drain:      node.Drain,
-		Status:     node.Status,
-		Meta:       make(map[string]string),
+		SchedulingEligibility: node.SchedulingEligibility,
+		Status:                node.Status,
+		HTTPAddr:              node.Address,
+		Meta:                  make(map[string]string),
 	}
 
 	// Build meta configuration parameters

@@ -5,7 +5,6 @@ import (
 	"time"
 
 	nomad "github.com/hashicorp/nomad/api"
-	nomadStructs "github.com/hashicorp/nomad/nomad/structs"
 	"github.com/mitchellh/hashstructure"
 	"github.com/mitchellh/mapstructure"
 
@@ -44,14 +43,6 @@ func (c *nomadClient) NodeWatcher(nodeRegistry *structs.NodeRegistry,
 				continue
 			}
 
-			if node.Drain == true && node.Status == nomadStructs.NodeStatusReady {
-				logging.Warning("client/node_discovery: node %v has been placed in "+
-					"drain mode, initiating deregistration of the node", node.ID)
-
-				Deregister(node.ID, nodeRegistry)
-				continue
-			}
-
 			switch node.Status {
 
 			// If the node is in a ready state, determine if scaling has been
@@ -75,7 +66,7 @@ func (c *nomadClient) NodeWatcher(nodeRegistry *structs.NodeRegistry,
 					// If the node has been previously observed and registered, it
 					// should be deregistered.
 					if _, ok := nodeRegistry.RegisteredNodes[node.ID]; ok {
-						Deregister(node.ID, nodeRegistry)
+						Deregister(node, nodeRegistry)
 					}
 
 					continue
@@ -86,10 +77,18 @@ func (c *nomadClient) NodeWatcher(nodeRegistry *structs.NodeRegistry,
 						"attempting to register node %v: %v", nodeRecord.ID, err)
 				}
 
+				// Node is in a bad state, terminate and deregister
+				if node.SchedulingEligibility == "ineligible" {
+					logging.Warning("client/node_discovery: node %v has been placed in "+
+						"drain mode, initiating deregistration of the node", node.ID)
+					Deregister(node, nodeRegistry)
+					continue
+				}
+
 				if !nodeConfig.ScalingEnabled {
 					logging.Debug("client/node_discovery: scaling has been disabled "+
 						"on node %v, initiating deregistration of the node", node.ID)
-					Deregister(node.ID, nodeRegistry)
+					Deregister(node, nodeRegistry)
 				}
 
 			// If the node is down, deregister the node.
@@ -99,7 +98,7 @@ func (c *nomadClient) NodeWatcher(nodeRegistry *structs.NodeRegistry,
 				// the meta index of each node.
 				logging.Warning("client/node_discovery: node %v is down, initiating "+
 					"deregistration of the node", node.ID)
-				Deregister(node.ID, nodeRegistry)
+				Deregister(node, nodeRegistry)
 			}
 		}
 
@@ -233,12 +232,6 @@ func Register(node *nomad.Node, workerPool *structs.WorkerPool,
 			structs.NodeStatusReady)
 	}
 
-	// Decline to register the node if drain mode is enabled.
-	if node.Drain {
-		return fmt.Errorf("an attempt to register node %v failed because the "+
-			"node is in drain mode", node.ID)
-	}
-
 	nodeRegistry.Lock.Lock()
 	defer nodeRegistry.Lock.Unlock()
 
@@ -262,6 +255,7 @@ func Register(node *nomad.Node, workerPool *structs.WorkerPool,
 			existingPool.ScalingEnabled = workerPool.ScalingEnabled
 			existingPool.NotificationUID = workerPool.NotificationUID
 			existingPool.ScalingThreshold = workerPool.ScalingThreshold
+			existingPool.ScaleFactor = workerPool.ScaleFactor
 		}
 
 		// If the node is not already known to the worker pool, register it.
@@ -313,28 +307,37 @@ func Register(node *nomad.Node, workerPool *structs.WorkerPool,
 // Deregister is responsible for removing a node from a worker pool record.
 // If after node deregistration, a worker pool has no remaining nodes, the
 // worker pool is removed from the node registry.
-func Deregister(node string, nodeRegistry *structs.NodeRegistry) (err error) {
+func Deregister(node *nomad.NodeListStub, nodeRegistry *structs.NodeRegistry) (err error) {
 	nodeRegistry.Lock.Lock()
 	defer nodeRegistry.Lock.Unlock()
 
 	// Return if there is no node registration to remove.
-	pool, ok := nodeRegistry.RegisteredNodes[node]
+	pool, ok := nodeRegistry.RegisteredNodes[node.ID]
 	if !ok {
 		return fmt.Errorf("node %v was not previously registered, no "+
 			"deregistration is required", node)
 	}
 
-	logging.Debug("client/node_discovery: deregistring node %v from previously "+
-		"discovered worker pool %v", node, pool)
+	logging.Debug("client/node_discovery: deregistering node %v from previously "+
+		"discovered worker pool %v", node.ID, pool)
 
 	// Obtain a reference to the worker pool record.
 	workerPool := nodeRegistry.WorkerPools[pool]
 
+	// Attempt to remove node since it will no longer be tracked
+	err = workerPool.ScalingProvider.Remove(workerPool, node.Address)
+	if err != nil {
+		logging.Warning("client/node_discovery: attempted to remove node %v from "+
+			"%v worker pool, but failed with %v", node.ID, pool, err)
+	} else {
+		logging.Debug("client/node_discovery: successfully removed node %v", node.Address)
+	}
+
 	// Remove the observed node record and deregister the node from the
 	// worker pool.
-	delete(workerPool.Nodes, node)
-	delete(workerPool.NodeRegistrations, node)
-	delete(nodeRegistry.RegisteredNodes, node)
+	delete(workerPool.Nodes, node.ID)
+	delete(workerPool.NodeRegistrations, node.ID)
+	delete(nodeRegistry.RegisteredNodes, node.ID)
 
 	// If the worker pool has no registered nodes left, deregister the
 	// worker pool.

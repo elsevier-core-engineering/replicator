@@ -89,7 +89,11 @@ func (sp *AwsScalingProvider) scaleOut(workerPool *structs.WorkerPool) error {
 	// and availability zones.
 	availabilityZones := asg.AutoScalingGroups[0].AvailabilityZones
 	terminationPolicies := asg.AutoScalingGroups[0].TerminationPolicies
-	newCapacity := *asg.AutoScalingGroups[0].DesiredCapacity + int64(1)
+	newCapacity := *asg.AutoScalingGroups[0].DesiredCapacity + int64(workerPool.ScaleFactor)
+	// If newCapacity is greater than the ASG's max then only update to the max allowed
+	if newCapacity > *asg.AutoScalingGroups[0].MaxSize {
+		newCapacity = *asg.AutoScalingGroups[0].MaxSize
+	}
 
 	// Setup autoscaling group input parameters.
 	params := &autoscaling.UpdateAutoScalingGroupInput{
@@ -135,7 +139,11 @@ func (sp *AwsScalingProvider) scaleIn(workerPool *structs.WorkerPool, config *st
 		workerPool.State.EligibleNodes[:len(workerPool.State.EligibleNodes)-1]
 
 	// Translate the node IP address to the EC2 instance ID.
-	instanceID := translateIptoID(targetNode, workerPool.Region)
+	instanceID, err := translateIptoID(targetNode, workerPool.Region)
+	if err != nil {
+		return fmt.Errorf("core/cluster_scaling: an error occurred while "+
+			"translating node ip to EC2 ID: %v", err)
+	}
 
 	// Setup parameters for the AWS API call to detach the target node
 	// from the worker pool autoscaling group.
@@ -182,6 +190,52 @@ func (sp *AwsScalingProvider) scaleIn(workerPool *structs.WorkerPool, config *st
 		logging.Error("cloud/aws: %v", err)
 	}
 
+	return nil
+}
+
+// Remove pulls a node out of the worker ASG and terminates it
+func (sp *AwsScalingProvider) Remove(workerPool *structs.WorkerPool, nodeAddr string) error {
+	// Translate the node IP address to the EC2 instance ID.
+	instanceID, err := translateIptoID(nodeAddr, workerPool.Region)
+	if err != nil {
+		return fmt.Errorf("cloud/aws: failed to translate node ip "+
+			"to EC2 ID: %v", err)
+	}
+	logging.Debug("cloud/aws: translated %v -> %v", nodeAddr, instanceID)
+	// Setup parameters for the AWS API call to detach the target node
+	// from the worker pool autoscaling group.
+	params := &autoscaling.DetachInstancesInput{
+		AutoScalingGroupName:           aws.String(workerPool.Name),
+		ShouldDecrementDesiredCapacity: aws.Bool(true),
+		InstanceIds: []*string{
+			aws.String(instanceID),
+		},
+	}
+	// Detach the target node from the worker pool autoscaling group.
+	// If this fails, continue on and terminate the instance
+	resp, err := sp.AsgService.DetachInstances(params)
+	if err != nil {
+		// We will continue to terminate the instance even if the detach fails
+		logging.Error("core/cluster_scaling: an error occurred while "+
+			"attempting to detach %v from worker pool %v: %v", instanceID,
+			workerPool.Name, err)
+	} else {
+		// Monitor the scaling activity result.
+		if *resp.Activities[0].StatusCode != autoscaling.ScalingActivityStatusCodeSuccessful {
+			err = checkClusterScalingResult(resp.Activities[0].ActivityId, sp.AsgService)
+			if err != nil {
+				return err
+			}
+			logging.Debug("core/cluster_scaling: successfully detached instance %v", instanceID)
+		}
+	}
+	// Once the node has been detached from the worker pool autoscaling group,
+	// terminate the instance.
+	err = terminateInstance(instanceID, workerPool.Region)
+	if err != nil {
+		return fmt.Errorf("an error occurred while attempting to terminate "+
+			"instance %v from worker pool %v", instanceID, workerPool.Name)
+	}
 	return nil
 }
 
@@ -261,7 +315,11 @@ func (sp *AwsScalingProvider) failedEventCleanup(workerNode string,
 
 	// Translate the IP address of the most recently launched node to
 	// EC2 instance ID so the node can be terminated or detached.
-	instanceID := translateIptoID(workerNode, workerPool.Region)
+	instanceID, err := translateIptoID(workerNode, workerPool.Region)
+	if err != nil {
+		return fmt.Errorf("an error occured while attempting to "+
+			"translate the node ip to EC2 ID: %v", err)
+	}
 
 	// If the retry threshold defined for the worker pool has been reached, we
 	// will detach the instance from the autoscaling group and decrement the

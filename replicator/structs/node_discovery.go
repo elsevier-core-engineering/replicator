@@ -22,6 +22,7 @@ func NewNodeRegistry() *NodeRegistry {
 func NewWorkerPool() *WorkerPool {
 	// Return a new worker pool object with default values set.
 	return &WorkerPool{
+		ScaleFactor:       1,
 		Cooldown:          300,
 		FaultTolerance:    1,
 		Nodes:             make(map[string]*nomad.Node),
@@ -44,6 +45,7 @@ type NodeRegistry struct {
 // WorkerPool represents the scaling configuration of a discovered
 // worker pool and its associated node membership.
 type WorkerPool struct {
+	ScaleFactor       int                    `mapstructure:"replicator_scale_factor"`
 	Cooldown          int                    `mapstructure:"replicator_cooldown"`
 	FaultTolerance    int                    `mapstructure:"replicator_node_fault_tolerance"`
 	Name              string                 `mapstructure:"replicator_worker_pool"`

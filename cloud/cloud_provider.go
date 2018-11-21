@@ -13,7 +13,7 @@ import (
 // BuiltinScalingProviders tracks the available scaling providers.
 // The provider name is the name used when configuring nodes for autoscaling.
 var BuiltinScalingProviders = map[string]ScalingProviderFactory{
-	"aws": aws.NewAwsScalingProvider,
+	"aws": aws.NewScalingProvider,
 }
 
 // ScalingProviderFactory is a factory method type for instantiating a new

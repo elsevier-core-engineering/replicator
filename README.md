@@ -1,24 +1,22 @@
 # Replicator
 
-[![Build Status](https://travis-ci.org/elsevier-core-engineering/replicator.svg?branch=master)](https://travis-ci.org/elsevier-core-engineering/replicator) [![Go Report Card](https://goreportcard.com/badge/github.com/elsevier-core-engineering/replicator)](https://goreportcard.com/report/github.com/elsevier-core-engineering/replicator) [![Join the chat at https://gitter.im/els-core-engineering/replicator/Lobby](https://badges.gitter.im/els-core-engineering/replicator/Lobby.svg)](https://gitter.im/els-core-engineering/replicator?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge) [![GoDoc](https://godoc.org/github.com/elsevier-core-engineering/replicator?status.svg)](https://godoc.org/github.com/elsevier-core-engineering/replicator)
-
 Replicator is a fast and highly concurrent Go daemon that provides dynamic scaling of [Nomad](https://github.com/hashicorp/nomad) jobs and worker nodes.
 
-- Replicator job scaling policies are configured as [meta parameters](https://www.nomadproject.io/docs/job-specification/meta.html) within the job specification. A job scaling policy allows scaling constraints to be defined per task-group. Currently supported scaling metrics are CPU and Memory; there are plans for additional metrics as well as different metric backends in the future. Details of configuring job scaling and other important information can be found on the Replicator [Job Scaling wiki page](https://github.com/elsevier-core-engineering/replicator/wiki/Job-Scaling).
+- Replicator job scaling policies are configured as [meta parameters](https://www.nomadproject.io/docs/job-specification/meta.html) within the job specification. A job scaling policy allows scaling constraints to be defined per task-group. Currently supported scaling metrics are CPU and Memory; there are plans for additional metrics as well as different metric backends in the future. Details of configuring job scaling and other important information can be found on the Replicator [Job Scaling wiki page](https://github.com/d3sw/replicator/wiki/Job-Scaling).
 
-- Replicator supports dynamic scaling of multiple, distinct cluster worker nodes in an AWS autoscaling group. Worker pool autoscaling is configured through Nomad client [meta parameters](https://www.nomadproject.io/docs/agent/configuration/client.html#meta). Details of configuring worker pool scaling and other important information can be found on the Replicator [Cluster Scaling wiki page](https://github.com/elsevier-core-engineering/replicator/wiki/Cluster-Scaling).
+- Replicator supports dynamic scaling of multiple, distinct cluster worker nodes in an AWS autoscaling group. Worker pool autoscaling is configured through Nomad client [meta parameters](https://www.nomadproject.io/docs/agent/configuration/client.html#meta). Details of configuring worker pool scaling and other important information can be found on the Replicator [Cluster Scaling wiki page](https://github.com/d3sw/replicator/wiki/Cluster-Scaling).
 
 *At present, worker pool autoscaling is only supported on AWS, however, future support for GCE and Azure are planned using the Go factory/provider pattern.*
 
 ### Download
 
-Pre-compiled releases for a number of platforms are available on the [GitHub release page](https://github.com/elsevier-core-engineering/replicator/releases). Docker images are also available from the elsce [Docker Hub page](https://hub.docker.com/r/elsce/replicator/).
+Pre-compiled releases for a number of platforms are available on the [GitHub release page](https://github.com/d3sw/replicator/releases).
 
 ## Running
 
-Replicator can be run in a number of ways; the recommended way is as a Nomad service job either using the [Docker driver](https://www.nomadproject.io/docs/drivers/docker.html) or the [exec driver](https://www.nomadproject.io/docs/drivers/exec.html). There are example Nomad [job specification files](https://github.com/elsevier-core-engineering/replicator/tree/master/example-jobs) available as a starting point.
+Replicator can be run in a number of ways; the recommended way is as a Nomad service job either using the [Docker driver](https://www.nomadproject.io/docs/drivers/docker.html) or the [exec driver](https://www.nomadproject.io/docs/drivers/exec.html). There are example Nomad [job specification files](https://github.com/d3sw/replicator/tree/master/example-jobs) available as a starting point.
 
-It's recommended to take a look at the agent [configuration options](https://github.com/elsevier-core-engineering/replicator/wiki/Agent-Command) to configure Replicator to run best in your environment.
+It's recommended to take a look at the agent [configuration options](https://github.com/d3sw/replicator/wiki/Agent-Command) to configure Replicator to run best in your environment.
 
 Replicator is fully capable of running as a distributed service; using [Consul sessions](https://www.consul.io/docs/internals/sessions.html) to provide leadership locking and exclusion. State is also written by Replicator to the Consul KV store, allowing Replicator failures to be handled quickly and efficiently.
 
@@ -36,6 +34,7 @@ client {
     "replicator_region"               = "us-east-1"
     "replicator_retry_threshold"      = 3
     "replicator_scaling_threshold"    = 3
+    "replicator_scale_factor"         = 1
     "replicator_worker_pool"          = "container-node-public-prod"
   }
 }
@@ -168,19 +167,19 @@ Until Vault integration is added, the instance pool which is capable of running 
 
 ### Commands
 
-Replicator supports a number of commands (CLI) which allow for the easy control and manipulation of the replicator binary. In-depth documentation about each command can be found on the Replicator [commands wiki page](https://github.com/elsevier-core-engineering/replicator/wiki/Commands).
+Replicator supports a number of commands (CLI) which allow for the easy control and manipulation of the replicator binary. In-depth documentation about each command can be found on the Replicator [commands wiki page](https://github.com/d3sw/replicator/wiki/Commands).
 
 #### Command: `agent`
 
 The `agent` command is the main entry point into Replicator. A subset of the available replicator agent configuration can optionally be passed in via CLI arguments and the configuration parameters passed via CLI flags will always take precedent over parameters specified in configuration files.
 
-Detailed information regarding the available CLI flags can be found in the Replicator [agent command wiki page](https://github.com/elsevier-core-engineering/replicator/wiki/Agent-Command).
+Detailed information regarding the available CLI flags can be found in the Replicator [agent command wiki page](https://github.com/d3sw/replicator/wiki/Agent-Command).
 
 #### Command: `failsafe`
 
 The `failsafe` command is used to toggle failsafe mode across the pool of Replicator agents. Failsafe mode prevents any Replicator agent from taking any scaling actions on the resource placed into failsafe mode.
 
-Detailed information about failsafe mode operations and the available CLI options can be found in the Replicator [failsafe command wiki page](https://github.com/elsevier-core-engineering/replicator/wiki/Failsafe-Command).
+Detailed information about failsafe mode operations and the available CLI options can be found in the Replicator [failsafe command wiki page](https://github.com/d3sw/replicator/wiki/Failsafe-Command).
 
 #### Command: `init`
 
@@ -210,6 +209,5 @@ Replicator will dynamically scale a job when:
 
 ## Contributing
 
-Contributions to Replicator are very welcome! Please refer to our [contribution guide](https://github.com/elsevier-core-engineering/replicator/blob/master/.github/CONTRIBUTING.md) for details about hacking on Replicator.
+Contributions to Replicator are very welcome! Please refer to our [contribution guide](https://github.com/d3sw/replicator/blob/master/.github/CONTRIBUTING.md) for details about hacking on Replicator.
 
-For questions, please check out the [Elsevier Core Engineering/replicator](https://gitter.im/els-core-engineering/replicator) room in Gitter.

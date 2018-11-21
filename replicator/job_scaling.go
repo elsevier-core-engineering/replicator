@@ -43,7 +43,7 @@ func (s *Server) asyncJobScaling(jobScalingPolicies *structs.JobScalingPolicies)
 		maxConcurrency = jobCount
 	}
 
-	logging.Debug("code/job_scaling: initiating %v concurrent scaling threads "+
+	logging.Debug("core/job_scaling: initiating %v concurrent scaling threads "+
 		"to process %v jobs", maxConcurrency, jobCount)
 
 	// Initiate workers to implement job scaling.

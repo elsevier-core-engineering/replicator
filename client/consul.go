@@ -10,8 +10,8 @@ import (
 	metrics "github.com/armon/go-metrics"
 	consul "github.com/hashicorp/consul/api"
 
-	"github.com/elsevier-core-engineering/replicator/logging"
-	"github.com/elsevier-core-engineering/replicator/replicator/structs"
+	"github.com/d3sw/replicator/logging"
+	"github.com/d3sw/replicator/replicator/structs"
 )
 
 // The client object is a wrapper to the Consul client provided by the Consul

@@ -10,13 +10,13 @@ import (
 	"time"
 
 	metrics "github.com/armon/go-metrics"
-	"github.com/elsevier-core-engineering/replicator/command"
-	"github.com/elsevier-core-engineering/replicator/command/base"
-	"github.com/elsevier-core-engineering/replicator/logging"
-	"github.com/elsevier-core-engineering/replicator/notifier"
-	"github.com/elsevier-core-engineering/replicator/replicator"
-	"github.com/elsevier-core-engineering/replicator/replicator/structs"
-	"github.com/elsevier-core-engineering/replicator/version"
+	"github.com/d3sw/replicator/command"
+	"github.com/d3sw/replicator/command/base"
+	"github.com/d3sw/replicator/logging"
+	"github.com/d3sw/replicator/notifier"
+	"github.com/d3sw/replicator/replicator"
+	"github.com/d3sw/replicator/replicator/structs"
+	"github.com/d3sw/replicator/version"
 )
 
 // Command is the agent command structure used to track passed args as well as

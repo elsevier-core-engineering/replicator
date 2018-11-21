@@ -5,8 +5,8 @@ import (
 	nomad "github.com/hashicorp/nomad/api"
 	nomadStructs "github.com/hashicorp/nomad/nomad/structs"
 
-	"github.com/elsevier-core-engineering/replicator/logging"
-	"github.com/elsevier-core-engineering/replicator/replicator/structs"
+	"github.com/d3sw/replicator/logging"
+	"github.com/d3sw/replicator/replicator/structs"
 )
 
 // EvaluatePoolScaling evaluates a worker pool capacity and utilization,

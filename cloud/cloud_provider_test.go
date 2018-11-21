@@ -3,7 +3,7 @@ package cloud
 import (
 	"testing"
 
-	"github.com/elsevier-core-engineering/replicator/replicator/structs"
+	"github.com/d3sw/replicator/replicator/structs"
 )
 
 // Test the parsing of scaling meta configuration parameters and

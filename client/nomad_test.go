@@ -3,7 +3,7 @@ package client
 import (
 	"testing"
 
-	"github.com/elsevier-core-engineering/replicator/replicator/structs"
+	"github.com/d3sw/replicator/replicator/structs"
 )
 
 func TestNomad_NewNomadClient(t *testing.T) {

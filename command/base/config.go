@@ -9,8 +9,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/elsevier-core-engineering/replicator/client"
-	"github.com/elsevier-core-engineering/replicator/replicator/structs"
+	"github.com/d3sw/replicator/client"
+	"github.com/d3sw/replicator/replicator/structs"
 )
 
 // Define default local addresses for Consul and Nomad.

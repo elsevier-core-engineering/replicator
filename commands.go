@@ -3,9 +3,9 @@ package main
 import (
 	"os"
 
-	"github.com/elsevier-core-engineering/replicator/command"
-	"github.com/elsevier-core-engineering/replicator/command/agent"
-	"github.com/elsevier-core-engineering/replicator/version"
+	"github.com/d3sw/replicator/command"
+	"github.com/d3sw/replicator/command/agent"
+	"github.com/d3sw/replicator/version"
 	"github.com/mitchellh/cli"
 )
 

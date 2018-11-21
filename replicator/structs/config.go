@@ -3,7 +3,7 @@ package structs
 import (
 	"net"
 
-	"github.com/elsevier-core-engineering/replicator/notifier"
+	"github.com/d3sw/replicator/notifier"
 )
 
 // Config is the main configuration struct used to configure the replicator

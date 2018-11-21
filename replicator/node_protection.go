@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/elsevier-core-engineering/replicator/logging"
-	"github.com/elsevier-core-engineering/replicator/replicator/structs"
+	"github.com/d3sw/replicator/logging"
+	"github.com/d3sw/replicator/replicator/structs"
 )
 
 func (r *Server) nodeProtectionCheck(nodeReg *structs.NodeRegistry) error {

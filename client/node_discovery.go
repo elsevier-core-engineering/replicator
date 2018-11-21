@@ -8,10 +8,10 @@ import (
 	"github.com/mitchellh/hashstructure"
 	"github.com/mitchellh/mapstructure"
 
-	"github.com/elsevier-core-engineering/replicator/cloud"
-	"github.com/elsevier-core-engineering/replicator/helper"
-	"github.com/elsevier-core-engineering/replicator/logging"
-	"github.com/elsevier-core-engineering/replicator/replicator/structs"
+	"github.com/d3sw/replicator/cloud"
+	"github.com/d3sw/replicator/helper"
+	"github.com/d3sw/replicator/logging"
+	"github.com/d3sw/replicator/replicator/structs"
 )
 
 // NodeWathcher is the method Replicator uses to perform discovery of all

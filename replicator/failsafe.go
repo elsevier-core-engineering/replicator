@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/elsevier-core-engineering/replicator/logging"
-	"github.com/elsevier-core-engineering/replicator/notifier"
-	"github.com/elsevier-core-engineering/replicator/replicator/structs"
+	"github.com/d3sw/replicator/logging"
+	"github.com/d3sw/replicator/notifier"
+	"github.com/d3sw/replicator/replicator/structs"
 )
 
 // Provides failsafe notification types.

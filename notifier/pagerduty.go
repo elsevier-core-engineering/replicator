@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/PagerDuty/go-pagerduty"
-	"github.com/elsevier-core-engineering/replicator/logging"
+	"github.com/d3sw/replicator/logging"
 )
 
 // PagerDutyProvider contains the required configuration to send PagerDuty

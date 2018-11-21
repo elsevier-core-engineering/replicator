@@ -9,7 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 
-	"github.com/elsevier-core-engineering/replicator/logging"
+	"github.com/d3sw/replicator/logging"
 )
 
 // translateIptoID translates the IP address of a node to the EC2 instance ID.

@@ -3,7 +3,7 @@ package agent
 import (
 	"net/http"
 
-	"github.com/elsevier-core-engineering/replicator/replicator/structs"
+	"github.com/d3sw/replicator/replicator/structs"
 )
 
 // StatusLeaderRequest is used to perform the Status.Leader API request.

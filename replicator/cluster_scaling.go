@@ -8,10 +8,10 @@ import (
 
 	metrics "github.com/armon/go-metrics"
 
-	"github.com/elsevier-core-engineering/replicator/client"
-	"github.com/elsevier-core-engineering/replicator/logging"
-	"github.com/elsevier-core-engineering/replicator/notifier"
-	"github.com/elsevier-core-engineering/replicator/replicator/structs"
+	"github.com/d3sw/replicator/client"
+	"github.com/d3sw/replicator/logging"
+	"github.com/d3sw/replicator/notifier"
+	"github.com/d3sw/replicator/replicator/structs"
 )
 
 // asyncClusterScaling triggers concurrent cluster scaling operations for

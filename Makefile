@@ -26,7 +26,7 @@ lint:
 	@echo "==> Running $@..."
 	@golint ./... | grep -v vendor | tee /dev/stderr
 
-test: fmt lint vet deps
+test: fmt lint vet
 	@echo "==> Running $@..."
 	@go test -v -tags "$(BUILDTAGS) cgo" $(shell go list ./... | grep -v vendor)
 

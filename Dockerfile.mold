@@ -1,0 +1,23 @@
+# Replicator is a daemon that provides automatic scaling of Nomad jobs and
+# worker nodes.
+#
+# docker run --rm -it \
+# 			 --name replicator \
+#				 elsce/replicator agent
+
+FROM alpine:edge
+LABEL maintainer Rampal Chopra<(rampal.chopra@bydeluxe.com>
+LABEL vendor "Platform Engineering"
+LABEL documentation "https://github.com/d3sw/replicator"
+
+ENV REPLICATOR_VERSION v1.0.4-rc0
+
+WORKDIR /usr/local/bin/
+
+RUN     apk --no-cache add \
+        ca-certificates
+
+COPY ./pkg/linux-amd64-replicator /usr/local/bin/replicator
+
+ENTRYPOINT [ "replicator" ]
+CMD [ "agent", "--help" ]

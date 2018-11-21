@@ -13,8 +13,8 @@ RUN \
   ./scripts/build.sh
 
 FROM alpine:edge AS app
-LABEL maintainer Eric Westfall<(eawestfall@gmail.com> (@eawestfall)
-LABEL vendor "Elsevier Core Engineering"
+LABEL maintainer Rampal Chopra<(rampal.chopra@bydeluxe.com>
+LABEL vendor "Platform Engineering"
 LABEL documentation "https://github.com/d3sw/replicator"
 
 ENV APP_PATH /go/src/github.com/d3sw/replicator

@@ -1,0 +1,19 @@
+build:
+- image: "golang"
+  cache: true
+  commands:
+    - apt-get update
+    - go get -u github.com/mitchellh/gox
+    - make release
+  workdir: "/go/src/github.com/d3sw/replicator"
+  environment: []
+artifacts:
+  registry: 583623634344.dkr.ecr.us-west-2.amazonaws.com
+  images:
+  - name: replicator
+    dockerfile: Dockerfile.mold
+    tags:
+      - "${APP_VERSION}"
+  publish:
+    - master
+    - "v${APP_VERSION}"

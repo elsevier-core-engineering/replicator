@@ -115,6 +115,8 @@ func (c *nomadClient) MostUtilizedGroupResource(gsp *structs.GroupScalingPolicy)
 	case gsp.Tasks.Resources.MemoryPercent:
 		gsp.ScalingMetric = ScalingMetricMemory
 	}
+	logging.Debug("Most Utilized group resource for group: %s is %v, CPU is %v, Mem is %v",
+		gsp.GroupName, gsp.ScalingMetric, gsp.Tasks.Resources.CPUPercent, gsp.Tasks.Resources.MemoryPercent)
 }
 
 // LeastAllocatedNode determines which worker pool node is consuming the least

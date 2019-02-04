@@ -132,13 +132,14 @@ func (c *nomadClient) jobScalingPolicyProcessor(jobID string, scaling *structs.J
 		if len(missedKeys) == 0 {
 			logging.Debug("client/job_scaling_policies: job %s and group %v has all meta required for autoscaling",
 				jobID, *group.Name)
-			go func() {
-				err := updateScalingPolicy(jobID, *group.Name, group.Meta, scaling)
+
+			go func(jobID, groupName string, groupMeta map[string]string, scaling *structs.JobScalingPolicies) {
+				err := updateScalingPolicy(jobID, groupName, groupMeta, scaling)
 				if err != nil {
 					logging.Error("client/job_scaling_policies: unable to update scaling policy for job %v and group %v: %v",
 						jobID, group.Name, err)
 				}
-			}()
+			}(jobID, *group.Name, group.Meta, scaling)
 		}
 	}
 }

@@ -27,7 +27,7 @@ rm -rf pkg/*
 
 # Build!
 echo "==> Building..."
-"`which gox`" \
+"$(command -v gox)" \
     -os="${XC_OS}" \
     -arch="${XC_ARCH}" \
     -osarch="!darwin/arm" \

@@ -135,7 +135,12 @@ func (c *nomadClient) jobScalingPolicyProcessor(jobID string, scaling *structs.J
 
 			// Create copies since this runs in a co-routine so that scope is locked in.
 			groupName := *group.Name
-			groupMeta := *group.Meta
+			groupMeta := make(map[string]string)
+			
+			for k,v := range group.Meta {
+				groupMeta[k] = v
+			}
+			
 			go func() {
 				err := updateScalingPolicy(jobID, groupName, groupMeta, scaling)
 				if err != nil {

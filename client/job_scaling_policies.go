@@ -133,21 +133,13 @@ func (c *nomadClient) jobScalingPolicyProcessor(jobID string, scaling *structs.J
 			logging.Debug("client/job_scaling_policies: job %s and group %v has all meta required for autoscaling",
 				jobID, *group.Name)
 
-			// Create copies since this runs in a co-routine so that scope is locked in.
-			groupName := *group.Name
-			groupMeta := make(map[string]string)
-
-			for k, v := range group.Meta {
-				groupMeta[k] = v
-			}
-
-			go func() {
+			go func(jobID, groupName string, groupMeta map[string]string, scaling *structs.JobScalingPolicies) {
 				err := updateScalingPolicy(jobID, groupName, groupMeta, scaling)
 				if err != nil {
 					logging.Error("client/job_scaling_policies: unable to update scaling policy for job %v and group %v: %v",
 						jobID, group.Name, err)
 				}
-			}()
+			}(jobID, *group.Name, group.Meta, scaling)
 		}
 	}
 }
